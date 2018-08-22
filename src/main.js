@@ -2,7 +2,8 @@ define([
     "skylark-utils/skylark",
     "./mover",
     "./resizer",
-    "./selector"
+    "./selector",
+    "./sorter"
 ], function(skylark) {
     return skylark;
 })

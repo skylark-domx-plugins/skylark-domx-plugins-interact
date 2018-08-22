@@ -1,5 +1,5 @@
 define([
-    "skylark-utils/skylark",
+    "./interact",
     "skylark-utils/langx",
     "skylark-utils/noder",
     "skylark-utils/datax",
@@ -9,7 +9,7 @@ define([
     "./mover",
     "skylark-utils/styler",
     "skylark-utils/query"
-],function(skylark, langx,noder,datax,finder,geom,eventer,mover,styler,$){
+],function(interact, langx,noder,datax,finder,geom,eventer,mover,styler,$){
     var on = eventer.on,
         off = eventer.off,
         attr = datax.attr,
@@ -116,5 +116,5 @@ define([
         resizable: resizable
     });
 
-    return skylark.resizer = resizer;
+    return interact.resizer = resizer;
 });

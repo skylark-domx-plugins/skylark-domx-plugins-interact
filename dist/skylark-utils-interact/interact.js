@@ -5,5 +5,5 @@
  * @link www.skylarkjs.org
  * @license MIT
  */
-define(["skylark-utils/skylark","./mover","./resizer","./selector","./sorter"],function(r){return r});
-//# sourceMappingURL=sourcemaps/main.js.map
+define(["skylark-utils/skylark","skylark-utils/langx"],function(r,a){var k=r.interact={};return k});
+//# sourceMappingURL=sourcemaps/interact.js.map

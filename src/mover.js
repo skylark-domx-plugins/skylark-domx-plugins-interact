@@ -1,12 +1,12 @@
 define([
-    "skylark-utils/skylark",
+    "./interact",
     "skylark-utils/langx",
     "skylark-utils/noder",
     "skylark-utils/datax",
     "skylark-utils/geom",
     "skylark-utils/eventer",
     "skylark-utils/styler"
-],function(skylark, langx,noder,datax,geom,eventer,styler){
+],function(interact, langx,noder,datax,geom,eventer,styler){
     var on = eventer.on,
         off = eventer.off,
         attr = datax.attr,
@@ -465,5 +465,5 @@ define([
 
     });
 
-    return skylark.mover = mover;
+    return interact.mover = mover;
 });
