@@ -1,7 +1,7 @@
 /**
  * skylark-utils-interact - The interact features enhancement for skylark utils.
  * @author Hudaokeji Co.,Ltd
- * @version v0.9.0-beta
+ * @version v0.9.0
  * @link www.skylarkjs.org
  * @license MIT
  */
