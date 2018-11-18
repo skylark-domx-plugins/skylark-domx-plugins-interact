@@ -5,5 +5,5 @@
  * @link www.skylarkjs.org
  * @license MIT
  */
-define(["skylark-utils/skylark","./mover","./resizer","./selector","./sorter"],function(r){return r});
+define(["./interact","./Draggable","./Droppable","./Movable","./Resizable","./Selectable","./Sortable"],function(e){return e});
 //# sourceMappingURL=sourcemaps/main.js.map

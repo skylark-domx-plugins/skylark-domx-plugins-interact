@@ -56,7 +56,7 @@
                 args.push(require(dep));
             })
 
-            module.exports = module.factory.apply(window, args);
+            module.exports = module.factory.apply(globals, args);
         }
         return module.exports;
     };
@@ -72,7 +72,7 @@
     var skylarkjs = require("skylark-langx/skylark");
 
     if (isCmd) {
-      exports = skylarkjs;
+      module.exports = skylarkjs;
     } else {
       globals.skylarkjs  = skylarkjs;
     }
@@ -81,8 +81,8 @@
 })(function(define,require) {
 
 define('skylark-utils-interact/interact',[
-    "skylark-utils/skylark",
-    "skylark-utils/langx"
+    "skylark-langx/skylark",
+    "skylark-langx/langx"
 ], function(skylark, langx) {
 	
 	var interact = skylark.interact = {
@@ -92,185 +92,574 @@ define('skylark-utils-interact/interact',[
 });
 
 
-define('skylark-utils-interact/mover',[
+define('skylark-utils-interact/ddmanager',[
     "./interact",
-    "skylark-utils/langx",
-    "skylark-utils/noder",
-    "skylark-utils/datax",
-    "skylark-utils/geom",
-    "skylark-utils/eventer",
-    "skylark-utils/styler"
-],function(interact, langx,noder,datax,geom,eventer,styler){
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/finder",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler"
+], function(interact, langx, noder, datax, finder, geom, eventer, styler) {
     var on = eventer.on,
         off = eventer.off,
         attr = datax.attr,
         removeAttr = datax.removeAttr,
         offset = geom.pagePosition,
         addClass = styler.addClass,
-        height = geom.height,
-        some = Array.prototype.some,
-        map = Array.prototype.map;
+        height = geom.height;
 
 
-    function movable(elm, params) {
-        function updateWithTouchData(e) {
-            var keys, i;
+    var DndManager = interact.DndManager = langx.Evented.inherit({
+        klassName: "DndManager",
 
-            if (e.changedTouches) {
-                keys = "screenX screenY pageX pageY clientX clientY".split(' ');
-                for (i = 0; i < keys.length; i++) {
-                    e[keys[i]] = e.changedTouches[0][keys[i]];
+        init: function() {
+
+        },
+
+        prepare: function(draggable) {
+            var e = eventer.create("preparing", {
+                dragSource: draggable.dragSource,
+                dragHandle: draggable.dragHandle
+            });
+            draggable.trigger(e);
+            draggable.dragSource = e.dragSource;
+        },
+
+        start: function(draggable, event) {
+
+            var p = geom.pagePosition(draggable.dragSource);
+            this.draggingOffsetX = parseInt(event.pageX - p.left);
+            this.draggingOffsetY = parseInt(event.pageY - p.top)
+
+            var e = eventer.create("started", {
+                elm: draggable.elm,
+                dragSource: draggable.dragSource,
+                dragHandle: draggable.dragHandle,
+                ghost: null,
+
+                transfer: {}
+            });
+
+            draggable.trigger(e);
+
+
+            this.dragging = draggable;
+
+            if (draggable.draggingClass) {
+                styler.addClass(draggable.dragSource, draggable.draggingClass);
+            }
+
+            this.draggingGhost = e.ghost;
+            if (!this.draggingGhost) {
+                this.draggingGhost = draggable.elm;
+            }
+
+            this.draggingTransfer = e.transfer;
+            if (this.draggingTransfer) {
+
+                langx.each(this.draggingTransfer, function(key, value) {
+                    event.dataTransfer.setData(key, value);
+                });
+            }
+
+            event.dataTransfer.setDragImage(this.draggingGhost, this.draggingOffsetX, this.draggingOffsetY);
+
+            event.dataTransfer.effectAllowed = "copyMove";
+
+            var e1 = eventer.create("dndStarted", {
+                elm: e.elm,
+                dragSource: e.dragSource,
+                dragHandle: e.dragHandle,
+                ghost: e.ghost,
+                transfer: e.transfer
+            });
+
+            this.trigger(e1);
+        },
+
+        over: function() {
+
+        },
+
+        end: function(dropped) {
+            var dragging = this.dragging;
+            if (dragging) {
+                if (dragging.draggingClass) {
+                    styler.removeClass(dragging.dragSource, dragging.draggingClass);
                 }
             }
+
+            var e = eventer.create("dndEnded", {});
+            this.trigger(e);
+
+
+            this.dragging = null;
+            this.draggingTransfer = null;
+            this.draggingGhost = null;
+            this.draggingOffsetX = null;
+            this.draggingOffsetY = null;
         }
+    });
 
-        params = params || {};
-        var handleEl = params.handle || elm,
-            auto = params.auto === false ? false : true,
-            constraints = params.constraints,
-            overlayDiv,
-            doc = params.document || document,
-            downButton,
-            start,
-            stop,
-            drag,
-            startX,
-            startY,
-            originalPos,
-            size,
-            startedCallback = params.started,
-            movingCallback = params.moving,
-            stoppedCallback = params.stopped,
+    var manager = new DndManager();
 
-            start = function(e) {
-                var docSize = geom.getDocumentSize(doc),
-                    cursor;
 
-                updateWithTouchData(e);
+    return manager;
+});
+define('skylark-utils-interact/Draggable',[
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/finder",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/plugins",
+    "./interact",
+    "./ddmanager"
+], function(langx, noder, datax, finder, geom, eventer, styler, plugins, interact,manager) {
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height;
 
-                e.preventDefault();
-                downButton = e.button;
-                //handleEl = getHandleEl();
-                startX = e.screenX;
-                startY = e.screenY;
 
-                originalPos = geom.relativePosition(elm);
-                size = geom.size(elm);
 
-                // Grab cursor from handle so we can place it on overlay
-                cursor = styler.css(handleEl, "curosr");
+    var Draggable = plugins.Plugin.inherit({
+        klassName: "Draggable",
+        
+        pluginName : "lark.draggable",
 
-                overlayDiv = noder.createElement("div");
-                styler.css(overlayDiv, {
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: docSize.width,
-                    height: docSize.height,
-                    zIndex: 0x7FFFFFFF,
-                    opacity: 0.0001,
-                    cursor: cursor
-                });
-                noder.append(doc.body, overlayDiv);
+        options : {
+            draggingClass : "dragging"
+        },
 
-                eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
+        _construct: function(elm, options) {
+            this.overrided(elm,options);
 
-                if (startedCallback) {
-                    startedCallback(e);
+            var self = this,
+                options = this.options;
+
+            self.draggingClass = options.draggingClass;
+
+            ["preparing", "started", "ended", "moving"].forEach(function(eventName) {
+                if (langx.isFunction(options[eventName])) {
+                    self.on(eventName, options[eventName]);
                 }
-            },
+            });
 
-            move = function(e) {
-                updateWithTouchData(e);
 
-                if (e.button !== 0) {
-                    return stop(e);
-                }
-
-                e.deltaX = e.screenX - startX;
-                e.deltaY = e.screenY - startY;
-
-                if (auto) {
-                    var l = originalPos.left + e.deltaX,
-                        t = originalPos.top + e.deltaY;
-                    if (constraints) {
-
-                        if (l < constraints.minX) {
-                            l = constraints.minX;
-                        }
-
-                        if (l > constraints.maxX) {
-                            l = constraints.maxX;
-                        }
-
-                        if (t < constraints.minY) {
-                            t = constraints.minY;
-                        }
-
-                        if (t > constraints.maxY) {
-                            t = constraints.maxY;
+            eventer.on(elm, {
+                "mousedown": function(e) {
+                    var options = self.options;
+                    if (options.handle) {
+                        self.dragHandle = finder.closest(e.target, options.handle);
+                        if (!self.dragHandle) {
+                            return;
                         }
                     }
+                    if (options.source) {
+                        self.dragSource = finder.closest(e.target, options.source);
+                    } else {
+                        self.dragSource = self._elm;
+                    }
+                    manager.prepare(self);
+                    if (self.dragSource) {
+                        datax.attr(self.dragSource, "draggable", 'true');
+                    }
+                },
+
+                "mouseup": function(e) {
+                    if (self.dragSource) {
+                        //datax.attr(self.dragSource, "draggable", 'false');
+                        self.dragSource = null;
+                        self.dragHandle = null;
+                    }
+                },
+
+                "dragstart": function(e) {
+                    datax.attr(self.dragSource, "draggable", 'false');
+                    manager.start(self, e);
+                },
+
+                "dragend": function(e) {
+                    eventer.stop(e);
+
+                    if (!manager.dragging) {
+                        return;
+                    }
+
+                    manager.end(false);
                 }
+            });
 
-                geom.relativePosition(elm, {
-                    left: l,
-                    top: t
-                })
-
-                e.preventDefault();
-                if (movingCallback) {
-                    movingCallback(e);
-                }
-            },
-
-            stop = function(e) {
-                updateWithTouchData(e);
-
-                eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
-
-                noder.remove(overlayDiv);
-
-                if (stoppedCallback) {
-                    stoppedCallback(e);
-                }
-            };
-
-        eventer.on(handleEl, "mousedown touchstart", start);
-
-        return {
-            // destroys the dragger.
-            remove: function() {
-                eventer.off(handleEl);
-            }
         }
-    }
-
-    function mover(){
-      return mover;
-    }
-
-    langx.mixin(mover, {
-
-        movable: movable
 
     });
 
-    return interact.mover = mover;
+    plugins.register(Draggable,"draggable");
+
+    return interact.Draggable = Draggable;
+});
+define('skylark-utils-interact/Droppable',[
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/finder",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/plugins",
+    "./interact",
+    "./ddmanager"
+], function(langx, noder, datax, finder, geom, eventer, styler, plugins, interact,manager) {
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height;
+
+
+    var Droppable = plugins.Plugin.inherit({
+        klassName: "Droppable",
+
+        pluginName : "lark.droppable",
+
+        options : {
+            draggingClass : "dragging"
+        },
+
+        _construct: function(elm, options) {
+            this.overrided(elm,options);
+
+            var self = this,
+                options = self.options,
+                draggingClass = options.draggingClass,
+                hoverClass,
+                activeClass,
+                acceptable = true;
+
+            ["started", "entered", "leaved", "dropped", "overing"].forEach(function(eventName) {
+                if (langx.isFunction(options[eventName])) {
+                    self.on(eventName, options[eventName]);
+                }
+            });
+
+            eventer.on(elm, {
+                "dragover": function(e) {
+                    e.stopPropagation()
+
+                    if (!acceptable) {
+                        return
+                    }
+
+                    var e2 = eventer.create("overing", {
+                        overElm: e.target,
+                        transfer: manager.draggingTransfer,
+                        acceptable: true
+                    });
+                    self.trigger(e2);
+
+                    if (e2.acceptable) {
+                        e.preventDefault() // allow drop
+
+                        e.dataTransfer.dropEffect = "copyMove";
+                    }
+
+                },
+
+                "dragenter": function(e) {
+                    var options = self.options,
+                        elm = self._elm;
+
+                    var e2 = eventer.create("entered", {
+                        transfer: manager.draggingTransfer
+                    });
+
+                    self.trigger(e2);
+
+                    e.stopPropagation()
+
+                    if (hoverClass && acceptable) {
+                        styler.addClass(elm, hoverClass)
+                    }
+                },
+
+                "dragleave": function(e) {
+                    var options = self.options,
+                        elm = self._elm;
+                    if (!acceptable) return false
+
+                    var e2 = eventer.create("leaved", {
+                        transfer: manager.draggingTransfer
+                    });
+
+                    self.trigger(e2);
+
+                    e.stopPropagation()
+
+                    if (hoverClass && acceptable) {
+                        styler.removeClass(elm, hoverClass);
+                    }
+                },
+
+                "drop": function(e) {
+                    var options = self.options,
+                        elm = self._elm;
+
+                    eventer.stop(e); // stops the browser from redirecting.
+
+                    if (!manager.dragging) return
+
+                    // manager.dragging.elm.removeClass('dragging');
+
+                    if (hoverClass && acceptable) {
+                        styler.addClass(elm, hoverClass)
+                    }
+
+                    var e2 = eventer.create("dropped", {
+                        transfer: manager.draggingTransfer
+                    });
+
+                    self.trigger(e2);
+
+                    manager.end(true)
+                }
+            });
+
+            manager.on("dndStarted", function(e) {
+                var e2 = eventer.create("started", {
+                    transfer: manager.draggingTransfer,
+                    acceptable: false
+                });
+
+                self.trigger(e2);
+
+                acceptable = e2.acceptable;
+                hoverClass = e2.hoverClass;
+                activeClass = e2.activeClass;
+
+                if (activeClass && acceptable) {
+                    styler.addClass(elm, activeClass);
+                }
+
+            }).on("dndEnded", function(e) {
+                var e2 = eventer.create("ended", {
+                    transfer: manager.draggingTransfer,
+                    acceptable: false
+                });
+
+                self.trigger(e2);
+
+                if (hoverClass && acceptable) {
+                    styler.removeClass(elm, hoverClass);
+                }
+                if (activeClass && acceptable) {
+                    styler.removeClass(elm, activeClass);
+                }
+
+                acceptable = false;
+                activeClass = null;
+                hoverClass = null;
+            });
+
+        }
+    });
+
+    plugins.register(Droppable,"droppable");
+
+    return interact.Droppable = Droppable;
+});
+define('skylark-utils-interact/Movable',[
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/plugins",
+    "./interact"
+],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height,
+        some = Array.prototype.some,
+        map = Array.prototype.map;
+
+    var Movable = plugins.Plugin.inherit({
+        klassName: "Movable",
+
+        pluginName : "lark.movable",
+
+
+        _construct : function (elm, options) {
+            this.overrided(elm,options);
+
+
+
+            function updateWithTouchData(e) {
+                var keys, i;
+
+                if (e.changedTouches) {
+                    keys = "screenX screenY pageX pageY clientX clientY".split(' ');
+                    for (i = 0; i < keys.length; i++) {
+                        e[keys[i]] = e.changedTouches[0][keys[i]];
+                    }
+                }
+            }
+
+            options = this.options;
+            var handleEl = options.handle || elm,
+                auto = options.auto === false ? false : true,
+                constraints = options.constraints,
+                overlayDiv,
+                doc = options.document || document,
+                downButton,
+                start,
+                stop,
+                drag,
+                startX,
+                startY,
+                originalPos,
+                size,
+                startedCallback = options.started,
+                movingCallback = options.moving,
+                stoppedCallback = options.stopped,
+
+                start = function(e) {
+                    var docSize = geom.getDocumentSize(doc),
+                        cursor;
+
+                    updateWithTouchData(e);
+
+                    e.preventDefault();
+                    downButton = e.button;
+                    //handleEl = getHandleEl();
+                    startX = e.screenX;
+                    startY = e.screenY;
+
+                    originalPos = geom.relativePosition(elm);
+                    size = geom.size(elm);
+
+                    // Grab cursor from handle so we can place it on overlay
+                    cursor = styler.css(handleEl, "curosr");
+
+                    overlayDiv = noder.createElement("div");
+                    styler.css(overlayDiv, {
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: docSize.width,
+                        height: docSize.height,
+                        zIndex: 0x7FFFFFFF,
+                        opacity: 0.0001,
+                        cursor: cursor
+                    });
+                    noder.append(doc.body, overlayDiv);
+
+                    eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
+
+                    if (startedCallback) {
+                        startedCallback(e);
+                    }
+                },
+
+                move = function(e) {
+                    updateWithTouchData(e);
+
+                    if (e.button !== 0) {
+                        return stop(e);
+                    }
+
+                    e.deltaX = e.screenX - startX;
+                    e.deltaY = e.screenY - startY;
+
+                    if (auto) {
+                        var l = originalPos.left + e.deltaX,
+                            t = originalPos.top + e.deltaY;
+                        if (constraints) {
+
+                            if (l < constraints.minX) {
+                                l = constraints.minX;
+                            }
+
+                            if (l > constraints.maxX) {
+                                l = constraints.maxX;
+                            }
+
+                            if (t < constraints.minY) {
+                                t = constraints.minY;
+                            }
+
+                            if (t > constraints.maxY) {
+                                t = constraints.maxY;
+                            }
+                        }
+                    }
+
+                    geom.relativePosition(elm, {
+                        left: l,
+                        top: t
+                    })
+
+                    e.preventDefault();
+                    if (movingCallback) {
+                        movingCallback(e);
+                    }
+                },
+
+                stop = function(e) {
+                    updateWithTouchData(e);
+
+                    eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
+
+                    noder.remove(overlayDiv);
+
+                    if (stoppedCallback) {
+                        stoppedCallback(e);
+                    }
+                };
+
+            eventer.on(handleEl, "mousedown touchstart", start);
+
+            this._handleEl = handleEl;
+
+        },
+
+        remove : function() {
+            eventer.off(this._handleEl);
+        }
+    });
+
+    plugins.register(Movable,"movable");
+
+    return interact.Movable = Movable;
 });
 
-define('skylark-utils-interact/resizer',[
+define('skylark-utils-interact/Resizable',[
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/finder",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/query",
+    "skylark-utils-dom/plugins",
     "./interact",
-    "skylark-utils/langx",
-    "skylark-utils/noder",
-    "skylark-utils/datax",
-    "skylark-utils/finder",
-    "skylark-utils/geom",
-    "skylark-utils/eventer",
-    "./mover",
-    "skylark-utils/styler",
-    "skylark-utils/query"
-],function(interact, langx,noder,datax,finder,geom,eventer,mover,styler,$){
+    "./Movable"
+],function(langx,noder,datax,finder,geom,eventer,styler,$,plugins,interact,Movable){
     var on = eventer.on,
         off = eventer.off,
         attr = datax.attr,
@@ -282,10 +671,12 @@ define('skylark-utils-interact/resizer',[
         map = Array.prototype.map;
 
 
+    var Resizable = plugins.Plugin.inherit({
+        klassName: "Resizable",
 
-    function resizable(elm, params) {
-
-        var defaultOptions = {
+        "pluginName" : "lark.resizable",
+        
+        options : {
             // prevents browser level actions like forward back gestures
             touchActionNone: true,
 
@@ -301,96 +692,88 @@ define('skylark-utils-interact/resizer',[
                 grabber: "",
                 selector: true
             }
-        };
+        },
 
-        params = params || {};
-        var handle = params.handle || {},
-            handleEl,
-            direction = params.direction || defaultOptions.direction,
-            startSize,
-            currentSize,
-            startedCallback = params.started,
-            movingCallback = params.moving,
-            stoppedCallback = params.stopped;
+        _construct :function (elm, options) {
+            this.overrided(elm,options);
 
-        if (langx.isString(handle)) {
-            handleEl = finder.find(elm,handle);
-        } else if (langx.isHtmlNode(handle)) {
-            handleEl = handle;
-        }
-        mover.movable(handleEl,{
-            auto : false,
-            started : function(e) {
-                startSize = geom.size(elm);
-                if (startedCallback) {
-                    startedCallback(e);
-                }
-            },
-            moving : function(e) {
-                currentSize = {
-                };
-                if (direction.left || direction.right) {
-                    currentSize.width = startSize.width + e.deltaX;
-                } else {
-                    currentSize.width = startSize.width;
-                }
 
-                if (direction.top || direction.bottom) {
-                    currentSize.height = startSize.height + e.deltaY;
-                } else {
-                    currentSize.height = startSize.height;
-                }
+            options = this.options;
+            var handle = options.handle || {},
+                handleEl,
+                direction = options.direction,
+                startSize,
+                currentSize,
+                startedCallback = options.started,
+                movingCallback = options.moving,
+                stoppedCallback = options.stopped;
 
-                geom.size(elm,currentSize);
-
-                if (movingCallback) {
-                    movingCallback(e);
-                }
-            },
-            stopped: function(e) {
-                if (stoppedCallback) {
-                    stoppedCallback(e);
-                }                
+            if (langx.isString(handle)) {
+                handleEl = finder.find(elm,handle);
+            } else if (langx.isHtmlNode(handle)) {
+                handleEl = handle;
             }
-        });
-        
-        return {
-            // destroys the dragger.
-            remove: function() {
-                eventer.off(handleEl);
-            }
+            Movable(handleEl,{
+                auto : false,
+                started : function(e) {
+                    startSize = geom.size(elm);
+                    if (startedCallback) {
+                        startedCallback(e);
+                    }
+                },
+                moving : function(e) {
+                    currentSize = {
+                    };
+                    if (direction.left || direction.right) {
+                        currentSize.width = startSize.width + e.deltaX;
+                    } else {
+                        currentSize.width = startSize.width;
+                    }
+
+                    if (direction.top || direction.bottom) {
+                        currentSize.height = startSize.height + e.deltaY;
+                    } else {
+                        currentSize.height = startSize.height;
+                    }
+
+                    geom.size(elm,currentSize);
+
+                    if (movingCallback) {
+                        movingCallback(e);
+                    }
+                },
+                stopped: function(e) {
+                    if (stoppedCallback) {
+                        stoppedCallback(e);
+                    }                
+                }
+            });
+            
+            this._handleEl = handleEl;
+        },
+
+        // destroys the dragger.
+        remove: function() {
+            eventer.off(this._handleEl);
         }
-
-    }
-
-    $.fn.resizable = function(params) {
-        this.each(function(el){
-            resizable(this,params);
-        });
-    };
-
-    function resizer(){
-      return resizer;
-    }
-
-    langx.mixin(resizer, {
-        resizable: resizable
     });
 
-    return interact.resizer = resizer;
+    plugins.register(Resizable,"resizable");
+
+    return interact.Resizable = Resizable;
 });
 
-define('skylark-utils-interact/selector',[
+define('skylark-utils-interact/Selectable',[
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/query",
     "./interact",
-    "skylark-utils/langx",
-    "skylark-utils/noder",
-    "skylark-utils/datax",
-    "skylark-utils/geom",
-    "skylark-utils/eventer",
-    "./mover",
-    "skylark-utils/styler",
-    "skylark-utils/query"
-],function(interact, langx,noder,datax,geom,eventer,mover,styler,$){
+    "./Movable"
+],function(langx,noder,datax,geom,eventer,styler,$,interact,Movable){
     var on = eventer.on,
         off = eventer.off,
         attr = datax.attr,
@@ -482,8 +865,6 @@ define('skylark-utils-interact/selector',[
         resizingCallback,
         stoppedCallback;
 
-
-
     function init (options) {
         options = options || {};
         classPrefix = options.classPrefix || "";
@@ -507,7 +888,7 @@ define('skylark-utils-interact/selector',[
         for (var n in handlers) {
             var handler = handlers[n];
             noder.append(container,handler);
-            mover.movable(handler,{
+            Movable(handler,{
                 auto : false,
                 started : started,
                 moving : resizing,
@@ -604,23 +985,24 @@ define('skylark-utils-interact/selector',[
 
     });
 
-    return interact.selector = selector;
+    return interact.Selectable = selector;
 });
 
-define('skylark-utils-interact/sorter',[
+define('skylark-utils-interact/Sortable',[
     "./interact",
     "skylark-langx/langx",
-    "skylark-utils/noder",
-    "skylark-utils/datax",
-    "skylark-utils/geom",
-    "skylark-utils/eventer",
-    "skylark-utils/styler",
-    "skylark-utils/dnd",
-    "skylark-utils/query",
-    "skylark-utils/widgets",
-    "./mover",
-    "./resizer"
-],function(interact, langx,noder,datax,geom,eventer,styler,dnd,$,widgets,mover,resizer){
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/query",
+    "skylark-utils-dom/plugins",
+    "./Draggable",
+    "./Droppable",
+    "./Movable",
+    "./Resizable"
+],function(interact, langx,noder,datax,geom,eventer,styler,$,plugins,Draggable,Droppable, Movable,Resizable){
     var on = eventer.on,
         off = eventer.off,
         attr = datax.attr,
@@ -631,7 +1013,7 @@ define('skylark-utils-interact/sorter',[
         some = Array.prototype.some,
         map = Array.prototype.map;
 
-    var Sorter = widgets.Widget.inherit({
+    var Sorter = plugins.Plugin.inherit({
         "klassName" : "Sorter",
 
         enable : function() {
@@ -651,132 +1033,120 @@ define('skylark-utils-interact/sorter',[
     var dragging, placeholders = $();
 
 
-    /*
-     * @param {HTMLElement} container  the element to use as a sortable container
-     * @param {Object} options  options object
-     * @param {String} [options.items = ""] 
-     * @param {Object} [options.connectWith =] the selector to create connected lists
-     * @param {Object} [options
-     * @param {Object} [options
-     */
-    function sortable(container,options) {
-        options = langx.mixin({
+    var Sortable = plugins.Plugin.inherit({
+        klassName: "Sortable",
+
+        pluginName : "lark.sortable",
+        
+        options : {
             connectWith: false,
             placeholder: null,
             placeholderClass: 'sortable-placeholder',
             draggingClass: 'sortable-dragging',
             items : null
+        },
 
-        },options);
+        /*
+         * @param {HTMLElement} container  the element to use as a sortable container
+         * @param {Object} options  options object
+         * @param {String} [options.items = ""] 
+         * @param {Object} [options.connectWith =] the selector to create connected lists
+         * @param {Object} [options
+         * @param {Object} [options
+         */
+        _construct : function (container,options) {
+            this.overrided(container,options);
 
-        var isHandle, index, 
-            $container = $(container), 
-            $items = $container.children(options.items);
-        var placeholder = $(options.placeholder || noder.createElement(/^(ul|ol)$/i.test(container.tagName) ? 'li' : 'div',{
-            "class" : options.placeholderClass
-        }));
+            options = this.options;
 
-        dnd.draggable(container,{
-            source : options.items,
-            handle : options.handle,
-            draggingClass : options.draggingClass,
-            preparing : function(e) {
-                //e.dragSource = e.handleElm;
-            },
-            started :function(e) {
-                e.ghost = e.dragSource;
-                e.transfer = {
-                    "text": "dummy"
-                };
-                index = (dragging = $(e.dragSource)).index();
-            },
-            ended : function(e) {
-                if (!dragging) {
-                    return;
-                }
-                dragging.show();
-                placeholders.detach();
-                if (index != dragging.index()) {
-                    dragging.parent().trigger('sortupdate', {item: dragging});
-                }
-                dragging = null;                
-            }
+            var isHandle, index, 
+                $container = $(container), 
+                $items = $container.children(options.items);
+            var placeholder = $(options.placeholder || noder.createElement(/^(ul|ol)$/i.test(container.tagName) ? 'li' : 'div',{
+                "class" : options.placeholderClass
+            }));
 
-        });
-
-        
-        dnd.droppable(container,{
-            started: function(e) {
-                e.acceptable = true;
-                e.activeClass = "active";
-                e.hoverClass = "over";
-            },
-            overing : function(e) {
-                if ($items.is(e.overElm)) {
-                    if (options.forcePlaceholderSize) {
-                        placeholder.height(dragging.outerHeight());
+            Draggable(container,{
+                source : options.items,
+                handle : options.handle,
+                draggingClass : options.draggingClass,
+                preparing : function(e) {
+                    //e.dragSource = e.handleElm;
+                },
+                started :function(e) {
+                    e.ghost = e.dragSource;
+                    e.transfer = {
+                        "text": "dummy"
+                    };
+                    index = (dragging = $(e.dragSource)).index();
+                },
+                ended : function(e) {
+                    if (!dragging) {
+                        return;
                     }
-                    dragging.hide();
-                    $(e.overElm)[placeholder.index() < $(e.overElm).index() ? 'after' : 'before'](placeholder);
-                    placeholders.not(placeholder).detach();
-                } else if (!placeholders.is(e.overElm) && !$(e.overElm).children(options.items).length) {
+                    dragging.show();
                     placeholders.detach();
-                    $(e.overElm).append(placeholder);
-                }                
-            },
-            dropped : function(e) {
-                placeholders.filter(':visible').after(dragging);
-                dragging.show();
-                placeholders.detach();
+                    if (index != dragging.index()) {
+                        dragging.parent().trigger('sortupdate', {item: dragging});
+                    }
+                    dragging = null;                
+                }
 
-                dragging = null;                
-              }
-        });
+            });
 
-        $container.data('items', options.items)
-        placeholders = placeholders.add(placeholder);
-        if (options.connectWith) {
-            $(options.connectWith).add(this).data('connectWith', options.connectWith);
-        }
-        
-        return {
-            remove : function() {
+            
+            Droppable(container,{
+                started: function(e) {
+                    e.acceptable = true;
+                    e.activeClass = "active";
+                    e.hoverClass = "over";
+                },
+                overing : function(e) {
+                    if ($items.is(e.overElm)) {
+                        if (options.forcePlaceholderSize) {
+                            placeholder.height(dragging.outerHeight());
+                        }
+                        dragging.hide();
+                        $(e.overElm)[placeholder.index() < $(e.overElm).index() ? 'after' : 'before'](placeholder);
+                        placeholders.not(placeholder).detach();
+                    } else if (!placeholders.is(e.overElm) && !$(e.overElm).children(options.items).length) {
+                        placeholders.detach();
+                        $(e.overElm).append(placeholder);
+                    }                
+                },
+                dropped : function(e) {
+                    placeholders.filter(':visible').after(dragging);
+                    dragging.show();
+                    placeholders.detach();
 
+                    dragging = null;                
+                  }
+            });
+
+            $container.data('items', options.items)
+            placeholders = placeholders.add(placeholder);
+            if (options.connectWith) {
+                $(options.connectWith).add(this).data('connectWith', options.connectWith);
             }
+            
         }
-    }
-
-
-    $.fn.sortable = function(options) {
-        options = langx.mixin({
-            connectWith: false
-        }, options);
-        return this.each(function() {
-            sortable(this,options);
-        });
-    };
-
-    function sorter(){
-      return sorter;
-    }
-
-    langx.mixin(sorter, {
-
-        sortable : sortable
-
     });
 
-    return interact.sorter = sorter;
+    plugins.register(Sortable,"sortable");
+
+    return interact.Sortable = Sortable;
 });
 
 define('skylark-utils-interact/main',[
-    "skylark-utils/skylark",
-    "./mover",
-    "./resizer",
-    "./selector",
-    "./sorter"
-], function(skylark) {
-    return skylark;
+    "./interact",
+    "./Draggable",
+    "./Droppable",
+    "./Movable",
+    "./Resizable",
+    "./Selectable",
+    "./Sortable"
+], function(interact) {
+    return interact;
 })
 ;
 define('skylark-utils-interact', ['skylark-utils-interact/main'], function (main) { return main; });

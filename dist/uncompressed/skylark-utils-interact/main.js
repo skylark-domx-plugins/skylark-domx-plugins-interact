@@ -1,9 +1,11 @@
 define([
-    "skylark-utils/skylark",
-    "./mover",
-    "./resizer",
-    "./selector",
-    "./sorter"
-], function(skylark) {
-    return skylark;
+    "./interact",
+    "./Draggable",
+    "./Droppable",
+    "./Movable",
+    "./Resizable",
+    "./Selectable",
+    "./Sortable"
+], function(interact) {
+    return interact;
 })

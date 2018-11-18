@@ -56,7 +56,7 @@
                 args.push(require(dep));
             })
 
-            module.exports = module.factory.apply(window, args);
+            module.exports = module.factory.apply(globals, args);
         }
         return module.exports;
     };
@@ -72,7 +72,7 @@
     var skylarkjs = require("skylark-langx/skylark");
 
     if (isCmd) {
-      exports = skylarkjs;
+      module.exports = skylarkjs;
     } else {
       globals.skylarkjs  = skylarkjs;
     }
@@ -84,10 +84,6 @@ define('skylark-langx/skylark',[], function() {
     var skylark = {
 
     };
-    return skylark;
-});
-
-define('skylark-utils/skylark',["skylark-langx/skylark"], function(skylark) {
     return skylark;
 });
 
@@ -227,156 +223,6 @@ define('skylark-langx/types',[
         type: type
     };
 
-});
-define('skylark-langx/arrays',[
-	"./types"
-],function(types){
-	var filter = Array.prototype.filter,
-		isArrayLike = types.isArrayLike;
-
-    function compact(array) {
-        return filter.call(array, function(item) {
-            return item != null;
-        });
-    }
-
-    function each(obj, callback) {
-        var length, key, i, undef, value;
-
-        if (obj) {
-            length = obj.length;
-
-            if (length === undef) {
-                // Loop object items
-                for (key in obj) {
-                    if (obj.hasOwnProperty(key)) {
-                        value = obj[key];
-                        if (callback.call(value, key, value) === false) {
-                            break;
-                        }
-                    }
-                }
-            } else {
-                // Loop array items
-                for (i = 0; i < length; i++) {
-                    value = obj[i];
-                    if (callback.call(value, i, value) === false) {
-                        break;
-                    }
-                }
-            }
-        }
-
-        return this;
-    }
-
-    function flatten(array) {
-        if (isArrayLike(array)) {
-            var result = [];
-            for (var i = 0; i < array.length; i++) {
-                var item = array[i];
-                if (isArrayLike(item)) {
-                    for (var j = 0; j < item.length; j++) {
-                        result.push(item[j]);
-                    }
-                } else {
-                    result.push(item);
-                }
-            }
-            return result;
-        } else {
-            return array;
-        }
-        //return array.length > 0 ? concat.apply([], array) : array;
-    }
-
-    function grep(array, callback) {
-        var out = [];
-
-        each(array, function(i, item) {
-            if (callback(item, i)) {
-                out.push(item);
-            }
-        });
-
-        return out;
-    }
-
-    function inArray(item, array) {
-        if (!array) {
-            return -1;
-        }
-        var i;
-
-        if (array.indexOf) {
-            return array.indexOf(item);
-        }
-
-        i = array.length;
-        while (i--) {
-            if (array[i] === item) {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
-    function makeArray(obj, offset, startWith) {
-       if (isArrayLike(obj) ) {
-        return (startWith || []).concat(Array.prototype.slice.call(obj, offset || 0));
-      }
-
-      // array of single index
-      return [ obj ];             
-    }
-
-    function map(elements, callback) {
-        var value, values = [],
-            i, key
-        if (isArrayLike(elements))
-            for (i = 0; i < elements.length; i++) {
-                value = callback.call(elements[i], elements[i], i);
-                if (value != null) values.push(value)
-            }
-        else
-            for (key in elements) {
-                value = callback.call(elements[key], elements[key], key);
-                if (value != null) values.push(value)
-            }
-        return flatten(values)
-    }
-
-    function uniq(array) {
-        return filter.call(array, function(item, idx) {
-            return array.indexOf(item) == idx;
-        })
-    }
-
-    return {
-        compact: compact,
-
-        first : function(items,n) {
-            if (n) {
-                return items.slice(0,n);
-            } else {
-                return items[0];
-            }
-        },
-
-	    each: each,
-
-        flatten: flatten,
-
-        inArray: inArray,
-
-        makeArray: makeArray,
-
-        map : map,
-        
-        uniq : uniq
-
-    }
 });
 define('skylark-langx/objects',[
 	"./types"
@@ -521,6 +367,52 @@ define('skylark-langx/objects',[
         var keys = [];
         for (var key in obj) keys.push(key);
         return keys;
+    }
+
+    function each(obj, callback) {
+        var length, key, i, undef, value;
+
+        if (obj) {
+            length = obj.length;
+
+            if (length === undef) {
+                // Loop object items
+                for (key in obj) {
+                    if (obj.hasOwnProperty(key)) {
+                        value = obj[key];
+                        if (callback.call(value, key, value) === false) {
+                            break;
+                        }
+                    }
+                }
+            } else {
+                // Loop array items
+                for (i = 0; i < length; i++) {
+                    value = obj[i];
+                    if (callback.call(value, i, value) === false) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        return this;
+    }
+
+    function extend(target) {
+        var deep, args = slice.call(arguments, 1);
+        if (typeof target == 'boolean') {
+            deep = target
+            target = args.shift()
+        }
+        if (args.length == 0) {
+            args = [target];
+            target = this;
+        }
+        args.forEach(function(arg) {
+            mixin(target, arg, deep);
+        });
+        return target;
     }
 
     // Retrieve the names of an object's own properties.
@@ -702,6 +594,10 @@ define('skylark-langx/objects',[
 
         defaults : createAssigner(allKeys, true),
 
+        each : each,
+
+        extend : extend,
+
         has: has,
 
         isEqual: isEqual,
@@ -722,6 +618,127 @@ define('skylark-langx/objects',[
     };
 
 });
+define('skylark-langx/arrays',[
+	"./types",
+    "./objects"
+],function(types,objects){
+	var filter = Array.prototype.filter,
+		isArrayLike = types.isArrayLike;
+
+    function compact(array) {
+        return filter.call(array, function(item) {
+            return item != null;
+        });
+    }
+
+    function flatten(array) {
+        if (isArrayLike(array)) {
+            var result = [];
+            for (var i = 0; i < array.length; i++) {
+                var item = array[i];
+                if (isArrayLike(item)) {
+                    for (var j = 0; j < item.length; j++) {
+                        result.push(item[j]);
+                    }
+                } else {
+                    result.push(item);
+                }
+            }
+            return result;
+        } else {
+            return array;
+        }
+        //return array.length > 0 ? concat.apply([], array) : array;
+    }
+
+    function grep(array, callback) {
+        var out = [];
+
+        each(array, function(i, item) {
+            if (callback(item, i)) {
+                out.push(item);
+            }
+        });
+
+        return out;
+    }
+
+    function inArray(item, array) {
+        if (!array) {
+            return -1;
+        }
+        var i;
+
+        if (array.indexOf) {
+            return array.indexOf(item);
+        }
+
+        i = array.length;
+        while (i--) {
+            if (array[i] === item) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    function makeArray(obj, offset, startWith) {
+       if (isArrayLike(obj) ) {
+        return (startWith || []).concat(Array.prototype.slice.call(obj, offset || 0));
+      }
+
+      // array of single index
+      return [ obj ];             
+    }
+
+    function map(elements, callback) {
+        var value, values = [],
+            i, key
+        if (isArrayLike(elements))
+            for (i = 0; i < elements.length; i++) {
+                value = callback.call(elements[i], elements[i], i);
+                if (value != null) values.push(value)
+            }
+        else
+            for (key in elements) {
+                value = callback.call(elements[key], elements[key], key);
+                if (value != null) values.push(value)
+            }
+        return flatten(values)
+    }
+
+    function uniq(array) {
+        return filter.call(array, function(item, idx) {
+            return array.indexOf(item) == idx;
+        })
+    }
+
+    return {
+        compact: compact,
+
+        first : function(items,n) {
+            if (n) {
+                return items.slice(0,n);
+            } else {
+                return items[0];
+            }
+        },
+
+	    each: objects.each,
+
+        flatten: flatten,
+
+        inArray: inArray,
+
+        makeArray: makeArray,
+
+        map : map,
+        
+        uniq : uniq
+
+    }
+});
 define('skylark-langx/klass',[
     "./arrays",
     "./objects",
@@ -739,7 +756,6 @@ define('skylark-langx/klass',[
 
         ctor.prototype = new f();
     }
-
 
     var f1 = function() {
         function extendClass(ctor, props, options) {
@@ -842,6 +858,14 @@ define('skylark-langx/klass',[
             return newCtor;
         }
 
+        function _constructor ()  {
+            if (this._construct) {
+                return this._construct.apply(this, arguments);
+            } else  if (this.init) {
+                return this.init.apply(this, arguments);
+            }
+        }
+
         return function createClass(props, parent, mixins,options) {
             if (isArray(parent)) {
                 options = mixins;
@@ -865,16 +889,6 @@ define('skylark-langx/klass',[
                 innerParent = mergeMixins(innerParent,mixins);
             }
 
-
-            var _constructor = props.constructor;
-            if (_constructor === Object) {
-                _constructor = function() {
-                    if (this.init) {
-                        return this.init.apply(this, arguments);
-                    }
-                };
-            };
-
             var klassName = props.klassName || "",
                 ctor = new Function(
                     "return function " + klassName + "() {" +
@@ -888,7 +902,6 @@ define('skylark-langx/klass',[
                 )();
 
 
-            ctor._constructor = _constructor;
             // Populate our constructed prototype object
             ctor.prototype = Object.create(innerParent.prototype);
 
@@ -898,6 +911,11 @@ define('skylark-langx/klass',[
 
             // And make this class extendable
             ctor.__proto__ = innerParent;
+
+
+            if (!ctor._constructor) {
+                ctor._constructor = _constructor;
+            } 
 
             if (mixins) {
                 ctor.__mixins__ = mixins;
@@ -2890,15 +2908,9 @@ define('skylark-langx/langx',[
 
     return skylark.langx = langx;
 });
-define('skylark-utils/langx',[
-    "skylark-langx/langx"
-], function(langx) {
-    return langx;
-});
-
 define('skylark-utils-interact/interact',[
-    "skylark-utils/skylark",
-    "skylark-utils/langx"
+    "skylark-langx/skylark",
+    "skylark-langx/langx"
 ], function(skylark, langx) {
 	
 	var interact = skylark.interact = {
@@ -2912,6 +2924,10 @@ define('skylark-utils-dom/skylark',["skylark-langx/skylark"], function(skylark) 
     return skylark;
 });
 
+define('skylark-utils-dom/dom',["./skylark"], function(skylark) {
+	return skylark.dom = {};
+});
+
 define('skylark-utils-dom/langx',[
     "skylark-langx/langx"
 ], function(langx) {
@@ -2919,12 +2935,22 @@ define('skylark-utils-dom/langx',[
 });
 
 define('skylark-utils-dom/browser',[
-    "./skylark",
+    "./dom",
     "./langx"
-], function(skylark,langx) {
+], function(dom,langx) {
+    "use strict";
+ 
     var checkedCssProperties = {
-        "transitionproperty": "TransitionProperty",
-    };
+            "transitionproperty": "TransitionProperty",
+        },
+        transEndEventNames = {
+          WebkitTransition : 'webkitTransitionEnd',
+          MozTransition    : 'transitionend',
+          OTransition      : 'oTransitionEnd otransitionend',
+          transition       : 'transitionend'
+        },
+        transEndEventName = null;
+
 
     var css3PropPrefix = "",
         css3StylePrefix = "",
@@ -2973,9 +2999,17 @@ define('skylark-utils-dom/browser',[
             var cssPropName = langx.dasherize(matched[2]);
             cssProps[cssPropName] = css3PropPrefix + cssPropName;
 
+            if (transEndEventNames[name]) {
+              transEndEventName = transEndEventNames[name];
+            }
         }
     }
 
+    if (!transEndEventName) {
+        if (testStyle["transition"] !== undefined) {
+            transEndEventName = transEndEventNames["transition"];
+        }
+    }
 
     function normalizeCssEvent(name) {
         return css3EventPrefix ? css3EventPrefix + name : name.toLowerCase();
@@ -3020,15 +3054,21 @@ define('skylark-utils-dom/browser',[
 
     });
 
+    if  (transEndEventName) {
+        browser.support.transition = {
+            end : transEndEventName
+        };
+    }
+
     testEl = null;
 
-    return skylark.browser = browser;
+    return dom.browser = browser;
 });
 
 define('skylark-utils-dom/styler',[
-    "./skylark",
+    "./dom",
     "./langx"
-], function(skylark, langx) {
+], function(dom, langx) {
     var every = Array.prototype.every,
         forEach = Array.prototype.forEach,
         camelCase = langx.camelCase,
@@ -3274,14 +3314,14 @@ define('skylark-utils-dom/styler',[
         toggleClass: toggleClass
     });
 
-    return skylark.styler = styler;
+    return dom.styler = styler;
 });
 define('skylark-utils-dom/noder',[
-    "./skylark",
+    "./dom",
     "./langx",
     "./browser",
     "./styler"
-], function(skylark, langx, browser, styler) {
+], function(dom, langx, browser, styler) {
     var isIE = !!navigator.userAgent.match(/Trident/g) || !!navigator.userAgent.match(/MSIE/g),
         fragmentRE = /^\s*<(\w+|!)[^>]*>/,
         singleTagRE = /^<(\w+)\s*\/?>(?:<\/\1>|)$/,
@@ -3320,6 +3360,36 @@ define('skylark-utils-dom/noder',[
             return name === chkName.toLowerCase();
         }
         return name;
+    };
+
+
+    function activeElement(doc) {
+        doc = doc || document;
+        var el;
+
+        // Support: IE 9 only
+        // IE9 throws an "Unspecified error" accessing document.activeElement from an <iframe>
+        try {
+            el = doc.activeElement;
+        } catch ( error ) {
+            el = doc.body;
+        }
+
+        // Support: IE 9 - 11 only
+        // IE may return null instead of an element
+        // Interestingly, this only seems to occur when NOT in an iframe
+        if ( !el ) {
+            el = doc.body;
+        }
+
+        // Support: IE 11 only
+        // IE11 returns a seemingly empty object in some cases when accessing
+        // document.activeElement from an <iframe>
+        if ( !el.nodeName ) {
+            el = doc.body;
+        }
+
+        return el;
     };
 
     function after(node, placing, copyByClone) {
@@ -3498,6 +3568,46 @@ define('skylark-utils-dom/noder',[
         }
     }
 
+
+    // Selectors
+    function focusable( element, hasTabindex ) {
+        var map, mapName, img, focusableIfVisible, fieldset,
+            nodeName = element.nodeName.toLowerCase();
+
+        if ( "area" === nodeName ) {
+            map = element.parentNode;
+            mapName = map.name;
+            if ( !element.href || !mapName || map.nodeName.toLowerCase() !== "map" ) {
+                return false;
+            }
+            img = $( "img[usemap='#" + mapName + "']" );
+            return img.length > 0 && img.is( ":visible" );
+        }
+
+        if ( /^(input|select|textarea|button|object)$/.test( nodeName ) ) {
+            focusableIfVisible = !element.disabled;
+
+            if ( focusableIfVisible ) {
+
+                // Form controls within a disabled fieldset are disabled.
+                // However, controls within the fieldset's legend do not get disabled.
+                // Since controls generally aren't placed inside legends, we skip
+                // this portion of the check.
+                fieldset = $( element ).closest( "fieldset" )[ 0 ];
+                if ( fieldset ) {
+                    focusableIfVisible = !fieldset.disabled;
+                }
+            }
+        } else if ( "a" === nodeName ) {
+            focusableIfVisible = element.href || hasTabindex;
+        } else {
+            focusableIfVisible = hasTabindex;
+        }
+
+        return focusableIfVisible && $( element ).is( ":visible" ) && visible( $( element ) );
+    };
+
+
    var rxhtmlTag = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([\w:]+)[^>]*)\/>/gi;
  
     /*   
@@ -3664,7 +3774,26 @@ define('skylark-utils-dom/noder',[
 
         return this;
     }
-    /*   
+
+    function scrollParent( elm, includeHidden ) {
+        var position = styler.css(elm,"position" ),
+            excludeStaticParent = position === "absolute",
+            overflowRegex = includeHidden ? /(auto|scroll|hidden)/ : /(auto|scroll)/,
+            scrollParent = this.parents().filter( function() {
+                var parent = $( this );
+                if ( excludeStaticParent && parent.css( "position" ) === "static" ) {
+                    return false;
+                }
+                return overflowRegex.test( parent.css( "overflow" ) + parent.css( "overflow-y" ) +
+                    parent.css( "overflow-x" ) );
+            } ).eq( 0 );
+
+        return position === "fixed" || !scrollParent.length ?
+            $( this[ 0 ].ownerDocument || document ) :
+            scrollParent;
+    };
+
+        /*   
      * Replace an old node with the specified node.
      * @param {Node} node
      * @param {Node} oldNode
@@ -3729,6 +3858,7 @@ define('skylark-utils-dom/noder',[
             update: update
         };
     }
+
 
     /*   
      * traverse the specified node and its descendants, perform the callback function on each
@@ -3801,6 +3931,12 @@ define('skylark-utils-dom/noder',[
     }
 
     langx.mixin(noder, {
+        active  : activeElement,
+
+        blur : function(el) {
+            el.blur();
+        },
+
         body: function() {
             return document.body;
         },
@@ -3821,6 +3957,8 @@ define('skylark-utils-dom/noder',[
         empty: empty,
 
         fullScreen: fullScreen,
+
+        focusable: focusable,
 
         html: html,
 
@@ -3863,20 +4001,14 @@ define('skylark-utils-dom/noder',[
         unwrap: unwrap
     });
 
-    return skylark.noder = noder;
+    return dom.noder = noder;
 });
-define('skylark-utils/noder',[
-    "skylark-utils-dom/noder"
-], function(noder) {
-    return noder;
-});
-
 define('skylark-utils-dom/finder',[
-    "./skylark",
+    "./dom",
     "./langx",
     "./browser",
     "./noder"
-], function(skylark, langx, browser, noder, velm) {
+], function(dom, langx, browser, noder, velm) {
     var local = {},
         filter = Array.prototype.filter,
         slice = Array.prototype.slice,
@@ -4156,6 +4288,10 @@ define('skylark-utils-dom/finder',[
             return document.activeElement === elm && (elm.href || elm.type || elm.tabindex);
         },
 
+        'focusable': function( elm ) {
+            return noder.focusable(elm, elm.tabindex != null );
+        },
+
         'first': function(elm, idx) {
             return (idx === 0);
         },
@@ -4207,6 +4343,12 @@ define('skylark-utils-dom/finder',[
 
         'selected': function(elm) {
             return !!elm.selected;
+        },
+
+        'tabbable': function(elm) {
+            var tabIndex = elm.tabindex,
+                hasTabindex = tabIndex != null;
+            return ( !hasTabindex || tabIndex >= 0 ) && noder.focusable( element, hasTabindex );
         },
 
         'text': function(elm) {
@@ -4967,13 +5109,13 @@ define('skylark-utils-dom/finder',[
         siblings: siblings
     });
 
-    return skylark.finder = finder;
+    return dom.finder = finder;
 });
 define('skylark-utils-dom/datax',[
-    "./skylark",
+    "./dom",
     "./langx",
     "./finder"
-], function(skylark, langx, finder) {
+], function(dom, langx, finder) {
     var map = Array.prototype.map,
         filter = Array.prototype.filter,
         camelCase = langx.camelCase,
@@ -5225,6 +5367,12 @@ define('skylark-utils-dom/datax',[
         }
     }
 
+
+    finder.pseudos.data = function( elem, i, match,dataName ) {
+        return !!data( elem, dataName || match[3]);
+    };
+   
+
     function datax() {
         return datax;
     }
@@ -5253,20 +5401,14 @@ define('skylark-utils-dom/datax',[
         val: val
     });
 
-    return skylark.datax = datax;
+    return dom.datax = datax;
 });
-define('skylark-utils/datax',[
-    "skylark-utils-dom/datax"
-], function(datax) {
-    return datax;
-});
-
 define('skylark-utils-dom/geom',[
-    "./skylark",
+    "./dom",
     "./langx",
     "./noder",
     "./styler"
-], function(skylark, langx, noder, styler) {
+], function(dom, langx, noder, styler) {
     var rootNodeRE = /^(?:body|html)$/i,
         px = langx.toPixel,
         offsetParent = noder.offsetParent,
@@ -5303,7 +5445,14 @@ define('skylark-utils-dom/geom',[
      * @param {HTMLElement} elm
      */
     function borderExtents(elm) {
-        var s = getComputedStyle(elm);
+        if (noder.isWindow(elm)) {
+            return {
+                left : 0,
+                top : 0,
+                right : 0,
+                bottom : 0
+            }
+        }        var s = getComputedStyle(elm);
         return {
             left: px(s.borderLeftWidth, elm),
             top: px(s.borderTopWidth, elm),
@@ -5495,6 +5644,14 @@ define('skylark-utils-dom/geom',[
      * @param {HTMLElement} elm
      */
     function marginExtents(elm) {
+        if (noder.isWindow(elm)) {
+            return {
+                left : 0,
+                top : 0,
+                right : 0,
+                bottom : 0
+            }
+        }
         var s = getComputedStyle(elm);
         return {
             left: px(s.marginLeft),
@@ -5506,8 +5663,8 @@ define('skylark-utils-dom/geom',[
 
 
     function marginRect(elm) {
-        var obj = this.relativeRect(elm),
-            me = this.marginExtents(elm);
+        var obj = relativeRect(elm),
+            me = marginExtents(elm);
 
         return {
             left: obj.left,
@@ -5519,8 +5676,8 @@ define('skylark-utils-dom/geom',[
 
 
     function marginSize(elm) {
-        var obj = this.size(elm),
-            me = this.marginExtents(elm);
+        var obj = size(elm),
+            me = marginExtents(elm);
 
         return {
             width: obj.width + me.left + me.right,
@@ -5533,6 +5690,14 @@ define('skylark-utils-dom/geom',[
      * @param {HTMLElement} elm
      */
     function paddingExtents(elm) {
+        if (noder.isWindow(elm)) {
+            return {
+                left : 0,
+                top : 0,
+                right : 0,
+                bottom : 0
+            }
+        }
         var s = getComputedStyle(elm);
         return {
             left: px(s.paddingLeft),
@@ -5793,309 +5958,6 @@ define('skylark-utils-dom/geom',[
             return this;
         }
     }
-    
-// in development start
-    function _place(/*DomNode*/ node, choices, layoutNode, aroundNodeCoords){
-        // summary:
-        //      Given a list of spots to put node, put it at the first spot where it fits,
-        //      of if it doesn't fit anywhere then the place with the least overflow
-        // choices: Array
-        //      Array of elements like: {corner: 'TL', pos: {x: 10, y: 20} }
-        //      Above example says to put the top-left corner of the node at (10,20)
-        // layoutNode: Function(node, aroundNodeCorner, nodeCorner, size)
-        //      for things like tooltip, they are displayed differently (and have different dimensions)
-        //      based on their orientation relative to the parent.   This adjusts the popup based on orientation.
-        //      It also passes in the available size for the popup, which is useful for tooltips to
-        //      tell them that their width is limited to a certain amount.   layoutNode() may return a value expressing
-        //      how much the popup had to be modified to fit into the available space.   This is used to determine
-        //      what the best placement is.
-        // aroundNodeCoords: Object
-        //      Size of aroundNode, ex: {w: 200, h: 50}
-
-        // get {x: 10, y: 10, w: 100, h:100} type obj representing position of
-        // viewport over document
-
-        var doc = noder.ownerDoc(node),
-            win = noder.ownerWindow(doc),
-            view = geom.size(win);
-
-        view.left = 0;
-        view.top = 0;
-
-        if(!node.parentNode || String(node.parentNode.tagName).toLowerCase() != "body"){
-            doc.body.appendChild(node);
-        }
-
-        var best = null;
-
-        some.apply(choices, function(choice){
-            var corner = choice.corner;
-            var pos = choice.pos;
-            var overflow = 0;
-
-            // calculate amount of space available given specified position of node
-            var spaceAvailable = {
-                w: {
-                    'L': view.left + view.width - pos.x,
-                    'R': pos.x - view.left,
-                    'M': view.width
-                }[corner.charAt(1)],
-
-                h: {
-                    'T': view.top + view.height - pos.y,
-                    'B': pos.y - view.top,
-                    'M': view.height
-                }[corner.charAt(0)]
-            };
-
-            if(layoutNode){
-                var res = layoutNode(node, choice.aroundCorner, corner, spaceAvailable, aroundNodeCoords);
-                overflow = typeof res == "undefined" ? 0 : res;
-            }
-
-            var bb = geom.size(node);
-
-            // coordinates and size of node with specified corner placed at pos,
-            // and clipped by viewport
-            var
-                startXpos = {
-                    'L': pos.x,
-                    'R': pos.x - bb.width,
-                    'M': Math.max(view.left, Math.min(view.left + view.width, pos.x + (bb.width >> 1)) - bb.width) // M orientation is more flexible
-                }[corner.charAt(1)],
-
-                startYpos = {
-                    'T': pos.y,
-                    'B': pos.y - bb.height,
-                    'M': Math.max(view.top, Math.min(view.top + view.height, pos.y + (bb.height >> 1)) - bb.height)
-                }[corner.charAt(0)],
-
-                startX = Math.max(view.left, startXpos),
-                startY = Math.max(view.top, startYpos),
-                endX = Math.min(view.left + view.width, startXpos + bb.width),
-                endY = Math.min(view.top + view.height, startYpos + bb.height),
-                width = endX - startX,
-                height = endY - startY;
-
-            overflow += (bb.width - width) + (bb.height - height);
-
-            if(best == null || overflow < best.overflow){
-                best = {
-                    corner: corner,
-                    aroundCorner: choice.aroundCorner,
-                    left: startX,
-                    top: startY,
-                    width: width,
-                    height: height,
-                    overflow: overflow,
-                    spaceAvailable: spaceAvailable
-                };
-            }
-
-            return !overflow;
-        });
-
-        // In case the best position is not the last one we checked, need to call
-        // layoutNode() again.
-        if(best.overflow && layoutNode){
-            layoutNode(node, best.aroundCorner, best.corner, best.spaceAvailable, aroundNodeCoords);
-        }
-
-
-        geom.boundingPosition(node,best);
-
-        return best;
-    }
-
-    function at(node, pos, corners, padding, layoutNode){
-        var choices = map.apply(corners, function(corner){
-            var c = {
-                corner: corner,
-                aroundCorner: reverse[corner],  // so TooltipDialog.orient() gets aroundCorner argument set
-                pos: {x: pos.x,y: pos.y}
-            };
-            if(padding){
-                c.pos.x += corner.charAt(1) == 'L' ? padding.x : -padding.x;
-                c.pos.y += corner.charAt(0) == 'T' ? padding.y : -padding.y;
-            }
-            return c;
-        });
-
-        return _place(node, choices, layoutNode);
-    }
-
-    function around(
-        /*DomNode*/     node,
-        /*DomNode|__Rectangle*/ anchor,
-        /*String[]*/    positions,
-        /*Boolean*/     leftToRight,
-        /*Function?*/   layoutNode){
-
-        // summary:
-        //      Position node adjacent or kitty-corner to anchor
-        //      such that it's fully visible in viewport.
-        // description:
-        //      Place node such that corner of node touches a corner of
-        //      aroundNode, and that node is fully visible.
-        // anchor:
-        //      Either a DOMNode or a rectangle (object with x, y, width, height).
-        // positions:
-        //      Ordered list of positions to try matching up.
-        //
-        //      - before: places drop down to the left of the anchor node/widget, or to the right in the case
-        //          of RTL scripts like Hebrew and Arabic; aligns either the top of the drop down
-        //          with the top of the anchor, or the bottom of the drop down with bottom of the anchor.
-        //      - after: places drop down to the right of the anchor node/widget, or to the left in the case
-        //          of RTL scripts like Hebrew and Arabic; aligns either the top of the drop down
-        //          with the top of the anchor, or the bottom of the drop down with bottom of the anchor.
-        //      - before-centered: centers drop down to the left of the anchor node/widget, or to the right
-        //          in the case of RTL scripts like Hebrew and Arabic
-        //      - after-centered: centers drop down to the right of the anchor node/widget, or to the left
-        //          in the case of RTL scripts like Hebrew and Arabic
-        //      - above-centered: drop down is centered above anchor node
-        //      - above: drop down goes above anchor node, left sides aligned
-        //      - above-alt: drop down goes above anchor node, right sides aligned
-        //      - below-centered: drop down is centered above anchor node
-        //      - below: drop down goes below anchor node
-        //      - below-alt: drop down goes below anchor node, right sides aligned
-        // layoutNode: Function(node, aroundNodeCorner, nodeCorner)
-        //      For things like tooltip, they are displayed differently (and have different dimensions)
-        //      based on their orientation relative to the parent.   This adjusts the popup based on orientation.
-        // leftToRight:
-        //      True if widget is LTR, false if widget is RTL.   Affects the behavior of "above" and "below"
-        //      positions slightly.
-        // example:
-        //  |   placeAroundNode(node, aroundNode, {'BL':'TL', 'TR':'BR'});
-        //      This will try to position node such that node's top-left corner is at the same position
-        //      as the bottom left corner of the aroundNode (ie, put node below
-        //      aroundNode, with left edges aligned).   If that fails it will try to put
-        //      the bottom-right corner of node where the top right corner of aroundNode is
-        //      (ie, put node above aroundNode, with right edges aligned)
-        //
-
-        // If around is a DOMNode (or DOMNode id), convert to coordinates.
-        var aroundNodePos;
-        if(typeof anchor == "string" || "offsetWidth" in anchor || "ownerSVGElement" in anchor){
-            aroundNodePos = domGeometry.position(anchor, true);
-
-            // For above and below dropdowns, subtract width of border so that popup and aroundNode borders
-            // overlap, preventing a double-border effect.  Unfortunately, difficult to measure the border
-            // width of either anchor or popup because in both cases the border may be on an inner node.
-            if(/^(above|below)/.test(positions[0])){
-                var anchorBorder = domGeometry.getBorderExtents(anchor),
-                    anchorChildBorder = anchor.firstChild ? domGeometry.getBorderExtents(anchor.firstChild) : {t:0,l:0,b:0,r:0},
-                    nodeBorder =  domGeometry.getBorderExtents(node),
-                    nodeChildBorder = node.firstChild ? domGeometry.getBorderExtents(node.firstChild) : {t:0,l:0,b:0,r:0};
-                aroundNodePos.y += Math.min(anchorBorder.t + anchorChildBorder.t, nodeBorder.t + nodeChildBorder.t);
-                aroundNodePos.h -=  Math.min(anchorBorder.t + anchorChildBorder.t, nodeBorder.t+ nodeChildBorder.t) +
-                    Math.min(anchorBorder.b + anchorChildBorder.b, nodeBorder.b + nodeChildBorder.b);
-            }
-        }else{
-            aroundNodePos = anchor;
-        }
-
-        // Compute position and size of visible part of anchor (it may be partially hidden by ancestor nodes w/scrollbars)
-        if(anchor.parentNode){
-            // ignore nodes between position:relative and position:absolute
-            var sawPosAbsolute = domStyle.getComputedStyle(anchor).position == "absolute";
-            var parent = anchor.parentNode;
-            while(parent && parent.nodeType == 1 && parent.nodeName != "BODY"){  //ignoring the body will help performance
-                var parentPos = domGeometry.position(parent, true),
-                    pcs = domStyle.getComputedStyle(parent);
-                if(/relative|absolute/.test(pcs.position)){
-                    sawPosAbsolute = false;
-                }
-                if(!sawPosAbsolute && /hidden|auto|scroll/.test(pcs.overflow)){
-                    var bottomYCoord = Math.min(aroundNodePos.y + aroundNodePos.h, parentPos.y + parentPos.h);
-                    var rightXCoord = Math.min(aroundNodePos.x + aroundNodePos.w, parentPos.x + parentPos.w);
-                    aroundNodePos.x = Math.max(aroundNodePos.x, parentPos.x);
-                    aroundNodePos.y = Math.max(aroundNodePos.y, parentPos.y);
-                    aroundNodePos.h = bottomYCoord - aroundNodePos.y;
-                    aroundNodePos.w = rightXCoord - aroundNodePos.x;
-                }
-                if(pcs.position == "absolute"){
-                    sawPosAbsolute = true;
-                }
-                parent = parent.parentNode;
-            }
-        }           
-
-        var x = aroundNodePos.x,
-            y = aroundNodePos.y,
-            width = "w" in aroundNodePos ? aroundNodePos.w : (aroundNodePos.w = aroundNodePos.width),
-            height = "h" in aroundNodePos ? aroundNodePos.h : (kernel.deprecated("place.around: dijit/place.__Rectangle: { x:"+x+", y:"+y+", height:"+aroundNodePos.height+", width:"+width+" } has been deprecated.  Please use { x:"+x+", y:"+y+", h:"+aroundNodePos.height+", w:"+width+" }", "", "2.0"), aroundNodePos.h = aroundNodePos.height);
-
-        // Convert positions arguments into choices argument for _place()
-        var choices = [];
-        function push(aroundCorner, corner){
-            choices.push({
-                aroundCorner: aroundCorner,
-                corner: corner,
-                pos: {
-                    x: {
-                        'L': x,
-                        'R': x + width,
-                        'M': x + (width >> 1)
-                    }[aroundCorner.charAt(1)],
-                    y: {
-                        'T': y,
-                        'B': y + height,
-                        'M': y + (height >> 1)
-                    }[aroundCorner.charAt(0)]
-                }
-            })
-        }
-        array.forEach(positions, function(pos){
-            var ltr =  leftToRight;
-            switch(pos){
-                case "above-centered":
-                    push("TM", "BM");
-                    break;
-                case "below-centered":
-                    push("BM", "TM");
-                    break;
-                case "after-centered":
-                    ltr = !ltr;
-                    // fall through
-                case "before-centered":
-                    push(ltr ? "ML" : "MR", ltr ? "MR" : "ML");
-                    break;
-                case "after":
-                    ltr = !ltr;
-                    // fall through
-                case "before":
-                    push(ltr ? "TL" : "TR", ltr ? "TR" : "TL");
-                    push(ltr ? "BL" : "BR", ltr ? "BR" : "BL");
-                    break;
-                case "below-alt":
-                    ltr = !ltr;
-                    // fall through
-                case "below":
-                    // first try to align left borders, next try to align right borders (or reverse for RTL mode)
-                    push(ltr ? "BL" : "BR", ltr ? "TL" : "TR");
-                    push(ltr ? "BR" : "BL", ltr ? "TR" : "TL");
-                    break;
-                case "above-alt":
-                    ltr = !ltr;
-                    // fall through
-                case "above":
-                    // first try to align left borders, next try to align right borders (or reverse for RTL mode)
-                    push(ltr ? "TL" : "TR", ltr ? "BL" : "BR");
-                    push(ltr ? "TR" : "TL", ltr ? "BR" : "BL");
-                    break;
-                default:
-                    // To assist dijit/_base/place, accept arguments of type {aroundCorner: "BL", corner: "TL"}.
-                    // Not meant to be used directly.  Remove for 2.0.
-                    push(pos.aroundCorner, pos.corner);
-            }
-        });
-
-        var position = _place(node, choices, layoutNode, {w: width, h: height});
-        position.aroundNodePos = aroundNodePos;
-
-        return position;
-    }
-// in development end
 
     function geom() {
         return geom;
@@ -6153,22 +6015,458 @@ define('skylark-utils-dom/geom',[
         width: width
     });
 
-    return skylark.geom = geom;
-});
-define('skylark-utils/geom',[
-    "skylark-utils-dom/geom"
-], function(geom) {
-    return geom;
-});
+    ( function() {
+        var max = Math.max,
+            abs = Math.abs,
+            rhorizontal = /left|center|right/,
+            rvertical = /top|center|bottom/,
+            roffset = /[\+\-]\d+(\.[\d]+)?%?/,
+            rposition = /^\w+/,
+            rpercent = /%$/;
 
+        function getOffsets( offsets, width, height ) {
+            return [
+                parseFloat( offsets[ 0 ] ) * ( rpercent.test( offsets[ 0 ] ) ? width / 100 : 1 ),
+                parseFloat( offsets[ 1 ] ) * ( rpercent.test( offsets[ 1 ] ) ? height / 100 : 1 )
+            ];
+        }
+
+        function parseCss( element, property ) {
+            return parseInt( styler.css( element, property ), 10 ) || 0;
+        }
+
+        function getDimensions( raw ) {
+            if ( raw.nodeType === 9 ) {
+                return {
+                    size: size(raw),
+                    offset: { top: 0, left: 0 }
+                };
+            }
+            if ( noder.isWindow( raw ) ) {
+                return {
+                    size: size(raw),
+                    offset: { 
+                        top: scrollTop(raw), 
+                        left: scrollLeft(raw) 
+                    }
+                };
+            }
+            if ( raw.preventDefault ) {
+                return {
+                    size : {
+                        width: 0,
+                        height: 0
+                    },
+                    offset: { 
+                        top: raw.pageY, 
+                        left: raw.pageX 
+                    }
+                };
+            }
+            return {
+                size: size(raw),
+                offset: pagePosition(raw)
+            };
+        }
+
+        function getScrollInfo( within ) {
+            var overflowX = within.isWindow || within.isDocument ? "" :
+                    styler.css(within.element,"overflow-x" ),
+                overflowY = within.isWindow || within.isDocument ? "" :
+                    styler.css(within.element,"overflow-y" ),
+                hasOverflowX = overflowX === "scroll" ||
+                    ( overflowX === "auto" && within.width < scrollWidth(within.element) ),
+                hasOverflowY = overflowY === "scroll" ||
+                    ( overflowY === "auto" && within.height < scrollHeight(within.element));
+            return {
+                width: hasOverflowY ? scrollbarWidth() : 0,
+                height: hasOverflowX ? scrollbarWidth() : 0
+            };
+        }
+
+        function getWithinInfo( element ) {
+            var withinElement = element || window,
+                isWindow = noder.isWindow( withinElement),
+                isDocument = !!withinElement && withinElement.nodeType === 9,
+                hasOffset = !isWindow && !isDocument,
+                msize = marginSize(withinElement);
+            return {
+                element: withinElement,
+                isWindow: isWindow,
+                isDocument: isDocument,
+                offset: hasOffset ? pagePosition(element) : { left: 0, top: 0 },
+                scrollLeft: scrollLeft(withinElement),
+                scrollTop: scrollTop(withinElement),
+                width: msize.width,
+                height: msize.height
+            };
+        }
+
+        function posit(elm,options ) {
+            // Make a copy, we don't want to modify arguments
+            options = langx.extend( {}, options );
+
+            var atOffset, targetWidth, targetHeight, targetOffset, basePosition, dimensions,
+                target = options.of,
+                within = getWithinInfo( options.within ),
+                scrollInfo = getScrollInfo( within ),
+                collision = ( options.collision || "flip" ).split( " " ),
+                offsets = {};
+
+            dimensions = getDimensions( target );
+            if ( target.preventDefault ) {
+
+                // Force left top to allow flipping
+                options.at = "left top";
+            }
+            targetWidth = dimensions.size.width;
+            targetHeight = dimensions.size.height;
+            targetOffset = dimensions.offset;
+
+            // Clone to reuse original targetOffset later
+            basePosition = langx.extend( {}, targetOffset );
+
+            // Force my and at to have valid horizontal and vertical positions
+            // if a value is missing or invalid, it will be converted to center
+            langx.each( [ "my", "at" ], function() {
+                var pos = ( options[ this ] || "" ).split( " " ),
+                    horizontalOffset,
+                    verticalOffset;
+
+                if ( pos.length === 1 ) {
+                    pos = rhorizontal.test( pos[ 0 ] ) ?
+                        pos.concat( [ "center" ] ) :
+                        rvertical.test( pos[ 0 ] ) ?
+                            [ "center" ].concat( pos ) :
+                            [ "center", "center" ];
+                }
+                pos[ 0 ] = rhorizontal.test( pos[ 0 ] ) ? pos[ 0 ] : "center";
+                pos[ 1 ] = rvertical.test( pos[ 1 ] ) ? pos[ 1 ] : "center";
+
+                // Calculate offsets
+                horizontalOffset = roffset.exec( pos[ 0 ] );
+                verticalOffset = roffset.exec( pos[ 1 ] );
+                offsets[ this ] = [
+                    horizontalOffset ? horizontalOffset[ 0 ] : 0,
+                    verticalOffset ? verticalOffset[ 0 ] : 0
+                ];
+
+                // Reduce to just the positions without the offsets
+                options[ this ] = [
+                    rposition.exec( pos[ 0 ] )[ 0 ],
+                    rposition.exec( pos[ 1 ] )[ 0 ]
+                ];
+            } );
+
+            // Normalize collision option
+            if ( collision.length === 1 ) {
+                collision[ 1 ] = collision[ 0 ];
+            }
+
+            if ( options.at[ 0 ] === "right" ) {
+                basePosition.left += targetWidth;
+            } else if ( options.at[ 0 ] === "center" ) {
+                basePosition.left += targetWidth / 2;
+            }
+
+            if ( options.at[ 1 ] === "bottom" ) {
+                basePosition.top += targetHeight;
+            } else if ( options.at[ 1 ] === "center" ) {
+                basePosition.top += targetHeight / 2;
+            }
+
+            atOffset = getOffsets( offsets.at, targetWidth, targetHeight );
+            basePosition.left += atOffset[ 0 ];
+            basePosition.top += atOffset[ 1 ];
+
+            return ( function(elem) {
+                var collisionPosition, using,
+                    msize = marginSize(elem),
+                    elemWidth = msize.width,
+                    elemHeight = msize.height,
+                    marginLeft = parseCss( elem, "marginLeft" ),
+                    marginTop = parseCss( elem, "marginTop" ),
+                    collisionWidth = elemWidth + marginLeft + parseCss( elem, "marginRight" ) +
+                        scrollInfo.width,
+                    collisionHeight = elemHeight + marginTop + parseCss( elem, "marginBottom" ) +
+                        scrollInfo.height,
+                    position = langx.extend( {}, basePosition ),
+                    myOffset = getOffsets( offsets.my, msize.width, msize.height);
+
+                if ( options.my[ 0 ] === "right" ) {
+                    position.left -= elemWidth;
+                } else if ( options.my[ 0 ] === "center" ) {
+                    position.left -= elemWidth / 2;
+                }
+
+                if ( options.my[ 1 ] === "bottom" ) {
+                    position.top -= elemHeight;
+                } else if ( options.my[ 1 ] === "center" ) {
+                    position.top -= elemHeight / 2;
+                }
+
+                position.left += myOffset[ 0 ];
+                position.top += myOffset[ 1 ];
+
+                collisionPosition = {
+                    marginLeft: marginLeft,
+                    marginTop: marginTop
+                };
+
+                langx.each( [ "left", "top" ], function( i, dir ) {
+                    if ( positions[ collision[ i ] ] ) {
+                        positions[ collision[ i ] ][ dir ]( position, {
+                            targetWidth: targetWidth,
+                            targetHeight: targetHeight,
+                            elemWidth: elemWidth,
+                            elemHeight: elemHeight,
+                            collisionPosition: collisionPosition,
+                            collisionWidth: collisionWidth,
+                            collisionHeight: collisionHeight,
+                            offset: [ atOffset[ 0 ] + myOffset[ 0 ], atOffset [ 1 ] + myOffset[ 1 ] ],
+                            my: options.my,
+                            at: options.at,
+                            within: within,
+                            elem: elem
+                        } );
+                    }
+                } );
+
+                if ( options.using ) {
+
+                    // Adds feedback as second argument to using callback, if present
+                    using = function( props ) {
+                        var left = targetOffset.left - position.left,
+                            right = left + targetWidth - elemWidth,
+                            top = targetOffset.top - position.top,
+                            bottom = top + targetHeight - elemHeight,
+                            feedback = {
+                                target: {
+                                    element: target,
+                                    left: targetOffset.left,
+                                    top: targetOffset.top,
+                                    width: targetWidth,
+                                    height: targetHeight
+                                },
+                                element: {
+                                    element: elem,
+                                    left: position.left,
+                                    top: position.top,
+                                    width: elemWidth,
+                                    height: elemHeight
+                                },
+                                horizontal: right < 0 ? "left" : left > 0 ? "right" : "center",
+                                vertical: bottom < 0 ? "top" : top > 0 ? "bottom" : "middle"
+                            };
+                        if ( targetWidth < elemWidth && abs( left + right ) < targetWidth ) {
+                            feedback.horizontal = "center";
+                        }
+                        if ( targetHeight < elemHeight && abs( top + bottom ) < targetHeight ) {
+                            feedback.vertical = "middle";
+                        }
+                        if ( max( abs( left ), abs( right ) ) > max( abs( top ), abs( bottom ) ) ) {
+                            feedback.important = "horizontal";
+                        } else {
+                            feedback.important = "vertical";
+                        }
+                        options.using.call( this, props, feedback );
+                    };
+                }
+
+                pagePosition(elem, langx.extend( position, { using: using } ));
+            })(elm);
+        }
+
+        var positions = {
+            fit: {
+                left: function( position, data ) {
+                    var within = data.within,
+                        withinOffset = within.isWindow ? within.scrollLeft : within.offset.left,
+                        outerWidth = within.width,
+                        collisionPosLeft = position.left - data.collisionPosition.marginLeft,
+                        overLeft = withinOffset - collisionPosLeft,
+                        overRight = collisionPosLeft + data.collisionWidth - outerWidth - withinOffset,
+                        newOverRight;
+
+                    // Element is wider than within
+                    if ( data.collisionWidth > outerWidth ) {
+
+                        // Element is initially over the left side of within
+                        if ( overLeft > 0 && overRight <= 0 ) {
+                            newOverRight = position.left + overLeft + data.collisionWidth - outerWidth -
+                                withinOffset;
+                            position.left += overLeft - newOverRight;
+
+                        // Element is initially over right side of within
+                        } else if ( overRight > 0 && overLeft <= 0 ) {
+                            position.left = withinOffset;
+
+                        // Element is initially over both left and right sides of within
+                        } else {
+                            if ( overLeft > overRight ) {
+                                position.left = withinOffset + outerWidth - data.collisionWidth;
+                            } else {
+                                position.left = withinOffset;
+                            }
+                        }
+
+                    // Too far left -> align with left edge
+                    } else if ( overLeft > 0 ) {
+                        position.left += overLeft;
+
+                    // Too far right -> align with right edge
+                    } else if ( overRight > 0 ) {
+                        position.left -= overRight;
+
+                    // Adjust based on position and margin
+                    } else {
+                        position.left = max( position.left - collisionPosLeft, position.left );
+                    }
+                },
+                top: function( position, data ) {
+                    var within = data.within,
+                        withinOffset = within.isWindow ? within.scrollTop : within.offset.top,
+                        outerHeight = data.within.height,
+                        collisionPosTop = position.top - data.collisionPosition.marginTop,
+                        overTop = withinOffset - collisionPosTop,
+                        overBottom = collisionPosTop + data.collisionHeight - outerHeight - withinOffset,
+                        newOverBottom;
+
+                    // Element is taller than within
+                    if ( data.collisionHeight > outerHeight ) {
+
+                        // Element is initially over the top of within
+                        if ( overTop > 0 && overBottom <= 0 ) {
+                            newOverBottom = position.top + overTop + data.collisionHeight - outerHeight -
+                                withinOffset;
+                            position.top += overTop - newOverBottom;
+
+                        // Element is initially over bottom of within
+                        } else if ( overBottom > 0 && overTop <= 0 ) {
+                            position.top = withinOffset;
+
+                        // Element is initially over both top and bottom of within
+                        } else {
+                            if ( overTop > overBottom ) {
+                                position.top = withinOffset + outerHeight - data.collisionHeight;
+                            } else {
+                                position.top = withinOffset;
+                            }
+                        }
+
+                    // Too far up -> align with top
+                    } else if ( overTop > 0 ) {
+                        position.top += overTop;
+
+                    // Too far down -> align with bottom edge
+                    } else if ( overBottom > 0 ) {
+                        position.top -= overBottom;
+
+                    // Adjust based on position and margin
+                    } else {
+                        position.top = max( position.top - collisionPosTop, position.top );
+                    }
+                }
+            },
+            flip: {
+                left: function( position, data ) {
+                    var within = data.within,
+                        withinOffset = within.offset.left + within.scrollLeft,
+                        outerWidth = within.width,
+                        offsetLeft = within.isWindow ? within.scrollLeft : within.offset.left,
+                        collisionPosLeft = position.left - data.collisionPosition.marginLeft,
+                        overLeft = collisionPosLeft - offsetLeft,
+                        overRight = collisionPosLeft + data.collisionWidth - outerWidth - offsetLeft,
+                        myOffset = data.my[ 0 ] === "left" ?
+                            -data.elemWidth :
+                            data.my[ 0 ] === "right" ?
+                                data.elemWidth :
+                                0,
+                        atOffset = data.at[ 0 ] === "left" ?
+                            data.targetWidth :
+                            data.at[ 0 ] === "right" ?
+                                -data.targetWidth :
+                                0,
+                        offset = -2 * data.offset[ 0 ],
+                        newOverRight,
+                        newOverLeft;
+
+                    if ( overLeft < 0 ) {
+                        newOverRight = position.left + myOffset + atOffset + offset + data.collisionWidth -
+                            outerWidth - withinOffset;
+                        if ( newOverRight < 0 || newOverRight < abs( overLeft ) ) {
+                            position.left += myOffset + atOffset + offset;
+                        }
+                    } else if ( overRight > 0 ) {
+                        newOverLeft = position.left - data.collisionPosition.marginLeft + myOffset +
+                            atOffset + offset - offsetLeft;
+                        if ( newOverLeft > 0 || abs( newOverLeft ) < overRight ) {
+                            position.left += myOffset + atOffset + offset;
+                        }
+                    }
+                },
+                top: function( position, data ) {
+                    var within = data.within,
+                        withinOffset = within.offset.top + within.scrollTop,
+                        outerHeight = within.height,
+                        offsetTop = within.isWindow ? within.scrollTop : within.offset.top,
+                        collisionPosTop = position.top - data.collisionPosition.marginTop,
+                        overTop = collisionPosTop - offsetTop,
+                        overBottom = collisionPosTop + data.collisionHeight - outerHeight - offsetTop,
+                        top = data.my[ 1 ] === "top",
+                        myOffset = top ?
+                            -data.elemHeight :
+                            data.my[ 1 ] === "bottom" ?
+                                data.elemHeight :
+                                0,
+                        atOffset = data.at[ 1 ] === "top" ?
+                            data.targetHeight :
+                            data.at[ 1 ] === "bottom" ?
+                                -data.targetHeight :
+                                0,
+                        offset = -2 * data.offset[ 1 ],
+                        newOverTop,
+                        newOverBottom;
+                    if ( overTop < 0 ) {
+                        newOverBottom = position.top + myOffset + atOffset + offset + data.collisionHeight -
+                            outerHeight - withinOffset;
+                        if ( newOverBottom < 0 || newOverBottom < abs( overTop ) ) {
+                            position.top += myOffset + atOffset + offset;
+                        }
+                    } else if ( overBottom > 0 ) {
+                        newOverTop = position.top - data.collisionPosition.marginTop + myOffset + atOffset +
+                            offset - offsetTop;
+                        if ( newOverTop > 0 || abs( newOverTop ) < overBottom ) {
+                            position.top += myOffset + atOffset + offset;
+                        }
+                    }
+                }
+            },
+            flipfit: {
+                left: function() {
+                    positions.flip.left.apply( this, arguments );
+                    positions.fit.left.apply( this, arguments );
+                },
+                top: function() {
+                    positions.flip.top.apply( this, arguments );
+                    positions.fit.top.apply( this, arguments );
+                }
+            }
+        };
+
+        geom.posit = posit;
+    })();
+
+    return dom.geom = geom;
+});
 define('skylark-utils-dom/eventer',[
-    "./skylark",
+    "./dom",
     "./langx",
     "./browser",
     "./finder",
     "./noder",
     "./datax"
-], function(skylark, langx, browser, finder, noder, datax) {
+], function(dom, langx, browser, finder, noder, datax) {
     var mixin = langx.mixin,
         each = langx.each,
         slice = Array.prototype.slice,
@@ -6803,6 +7101,16 @@ define('skylark-utils-dom/eventer',[
 
     }
 
+    if (browser.support.transitionEnd) {
+        specialEvents.transitionEnd = {
+//          handle: function (e) {
+//            if ($(e.target).is(this)) return e.handleObj.handler.apply(this, arguments)
+//          },
+          bindType: browser.support.transition.end,
+          delegateType: browser.support.transition.end
+        }        
+    }
+
     function eventer() {
         return eventer;
     }
@@ -6832,446 +7140,16 @@ define('skylark-utils-dom/eventer',[
 
     });
 
-    return skylark.eventer = eventer;
+    return dom.eventer = eventer;
 });
-define('skylark-utils/eventer',[
-    "skylark-utils-dom/eventer"
-], function(eventer) {
-    return eventer;
-});
-
-define('skylark-utils/styler',[
-    "./skylark",
-    "./langx"
-], function(skylark, langx) {
-    var every = Array.prototype.every,
-        forEach = Array.prototype.forEach,
-        camelCase = langx.camelCase,
-        dasherize = langx.dasherize;
-
-    function maybeAddPx(name, value) {
-        return (typeof value == "number" && !cssNumber[dasherize(name)]) ? value + "px" : value
-    }
-
-    var cssNumber = {
-            'column-count': 1,
-            'columns': 1,
-            'font-weight': 1,
-            'line-height': 1,
-            'opacity': 1,
-            'z-index': 1,
-            'zoom': 1
-        },
-        classReCache = {
-
-        };
-
-    function classRE(name) {
-        return name in classReCache ?
-            classReCache[name] : (classReCache[name] = new RegExp('(^|\\s)' + name + '(\\s|$)'));
-    }
-
-    // access className property while respecting SVGAnimatedString
-    /*
-     * Adds the specified class(es) to each element in the set of matched elements.
-     * @param {HTMLElement} node
-     * @param {String} value
-     */
-    function className(node, value) {
-        var klass = node.className || '',
-            svg = klass && klass.baseVal !== undefined
-
-        if (value === undefined) return svg ? klass.baseVal : klass
-        svg ? (klass.baseVal = value) : (node.className = value)
-    }
-
-    function disabled(elm, value ) {
-        if (arguments.length < 2) {
-            return !!this.dom.disabled;
-        }
-
-        elm.disabled = value;
-
-        return this;
-    }
-
-    var elementDisplay = {};
-
-    function defaultDisplay(nodeName) {
-        var element, display
-        if (!elementDisplay[nodeName]) {
-            element = document.createElement(nodeName)
-            document.body.appendChild(element)
-            display = getComputedStyle(element, '').getPropertyValue("display")
-            element.parentNode.removeChild(element)
-            display == "none" && (display = "block")
-            elementDisplay[nodeName] = display
-        }
-        return elementDisplay[nodeName]
-    }
-    /*
-     * Display the matched elements.
-     * @param {HTMLElement} elm
-     */
-    function show(elm) {
-        styler.css(elm, "display", "");
-        if (styler.css(elm, "display") == "none") {
-            styler.css(elm, "display", defaultDisplay(elm.nodeName));
-        }
-        return this;
-    }
-
-    function isInvisible(elm) {
-        return styler.css(elm, "display") == "none" || styler.css(elm, "opacity") == 0;
-    }
-
-    /*
-     * Hide the matched elements.
-     * @param {HTMLElement} elm
-     */
-    function hide(elm) {
-        styler.css(elm, "display", "none");
-        return this;
-    }
-
-    /*
-     * Adds the specified class(es) to each element in the set of matched elements.
-     * @param {HTMLElement} elm
-     * @param {String} name
-     */
-    function addClass(elm, name) {
-        if (!name) return this
-        var cls = className(elm),
-            names;
-        if (langx.isString(name)) {
-            names = name.split(/\s+/g);
-        } else {
-            names = name;
-        }
-        names.forEach(function(klass) {
-            var re = classRE(klass);
-            if (!cls.match(re)) {
-                cls += (cls ? " " : "") + klass;
-            }
-        });
-
-        className(elm, cls);
-
-        return this;
-    }
-    /*
-     * Get the value of a computed style property for the first element in the set of matched elements or set one or more CSS properties for every matched element.
-     * @param {HTMLElement} elm
-     * @param {String} property
-     * @param {Any} value
-     */
-    function css(elm, property, value) {
-        if (arguments.length < 3) {
-            var computedStyle,
-                computedStyle = getComputedStyle(elm, '')
-            if (langx.isString(property)) {
-                return elm.style[camelCase(property)] || computedStyle.getPropertyValue(dasherize(property))
-            } else if (langx.isArrayLike(property)) {
-                var props = {}
-                forEach.call(property, function(prop) {
-                    props[prop] = (elm.style[camelCase(prop)] || computedStyle.getPropertyValue(dasherize(prop)))
-                })
-                return props
-            }
-        }
-
-        var css = '';
-        if (typeof(property) == 'string') {
-            if (!value && value !== 0) {
-                elm.style.removeProperty(dasherize(property));
-            } else {
-                css = dasherize(property) + ":" + maybeAddPx(property, value)
-            }
-        } else {
-            for (key in property) {
-                if (property[key] === undefined) {
-                    continue;
-                }
-                if (!property[key] && property[key] !== 0) {
-                    elm.style.removeProperty(dasherize(key));
-                } else {
-                    css += dasherize(key) + ':' + maybeAddPx(key, property[key]) + ';'
-                }
-            }
-        }
-
-        elm.style.cssText += ';' + css;
-        return this;
-    }
-
-    /*
-     * Determine whether any of the matched elements are assigned the given class.
-     * @param {HTMLElement} elm
-     * @param {String} name
-     */
-    function hasClass(elm, name) {
-        var re = classRE(name);
-        return elm.className && elm.className.match(re);
-    }
-
-    /*
-     * Remove a single class, multiple classes, or all classes from each element in the set of matched elements.
-     * @param {HTMLElement} elm
-     * @param {String} name
-     */
-    function removeClass(elm, name) {
-        if (name) {
-            var cls = className(elm),
-                names;
-
-            if (langx.isString(name)) {
-                names = name.split(/\s+/g);
-            } else {
-                names = name;
-            }
-
-            names.forEach(function(klass) {
-                var re = classRE(klass);
-                if (cls.match(re)) {
-                    cls = cls.replace(re, " ");
-                }
-            });
-
-            className(elm, cls.trim());
-        } else {
-            className(elm, "");
-        }
-
-        return this;
-    }
-
-    /*
-     * Add or remove one or more classes from the specified element.
-     * @param {HTMLElement} elm
-     * @param {String} name
-     * @param {} when
-     */
-    function toggleClass(elm, name, when) {
-        var self = this;
-        name.split(/\s+/g).forEach(function(klass) {
-            if (when === undefined) {
-                when = !self.hasClass(elm, klass);
-            }
-            if (when) {
-                self.addClass(elm, klass);
-            } else {
-                self.removeClass(elm, klass)
-            }
-        });
-
-        return self;
-    }
-
-    var styler = function() {
-        return styler;
-    };
-
-    langx.mixin(styler, {
-        autocssfix: false,
-        cssHooks: {
-
-        },
-
-        addClass: addClass,
-        className: className,
-        css: css,
-        disabled : disabled,        
-        hasClass: hasClass,
-        hide: hide,
-        isInvisible: isInvisible,
-        removeClass: removeClass,
-        show: show,
-        toggleClass: toggleClass
-    });
-
-    return skylark.styler = styler;
-});
-define('skylark-utils-interact/mover',[
-    "./interact",
-    "skylark-utils/langx",
-    "skylark-utils/noder",
-    "skylark-utils/datax",
-    "skylark-utils/geom",
-    "skylark-utils/eventer",
-    "skylark-utils/styler"
-],function(interact, langx,noder,datax,geom,eventer,styler){
-    var on = eventer.on,
-        off = eventer.off,
-        attr = datax.attr,
-        removeAttr = datax.removeAttr,
-        offset = geom.pagePosition,
-        addClass = styler.addClass,
-        height = geom.height,
-        some = Array.prototype.some,
-        map = Array.prototype.map;
-
-
-    function movable(elm, params) {
-        function updateWithTouchData(e) {
-            var keys, i;
-
-            if (e.changedTouches) {
-                keys = "screenX screenY pageX pageY clientX clientY".split(' ');
-                for (i = 0; i < keys.length; i++) {
-                    e[keys[i]] = e.changedTouches[0][keys[i]];
-                }
-            }
-        }
-
-        params = params || {};
-        var handleEl = params.handle || elm,
-            auto = params.auto === false ? false : true,
-            constraints = params.constraints,
-            overlayDiv,
-            doc = params.document || document,
-            downButton,
-            start,
-            stop,
-            drag,
-            startX,
-            startY,
-            originalPos,
-            size,
-            startedCallback = params.started,
-            movingCallback = params.moving,
-            stoppedCallback = params.stopped,
-
-            start = function(e) {
-                var docSize = geom.getDocumentSize(doc),
-                    cursor;
-
-                updateWithTouchData(e);
-
-                e.preventDefault();
-                downButton = e.button;
-                //handleEl = getHandleEl();
-                startX = e.screenX;
-                startY = e.screenY;
-
-                originalPos = geom.relativePosition(elm);
-                size = geom.size(elm);
-
-                // Grab cursor from handle so we can place it on overlay
-                cursor = styler.css(handleEl, "curosr");
-
-                overlayDiv = noder.createElement("div");
-                styler.css(overlayDiv, {
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: docSize.width,
-                    height: docSize.height,
-                    zIndex: 0x7FFFFFFF,
-                    opacity: 0.0001,
-                    cursor: cursor
-                });
-                noder.append(doc.body, overlayDiv);
-
-                eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
-
-                if (startedCallback) {
-                    startedCallback(e);
-                }
-            },
-
-            move = function(e) {
-                updateWithTouchData(e);
-
-                if (e.button !== 0) {
-                    return stop(e);
-                }
-
-                e.deltaX = e.screenX - startX;
-                e.deltaY = e.screenY - startY;
-
-                if (auto) {
-                    var l = originalPos.left + e.deltaX,
-                        t = originalPos.top + e.deltaY;
-                    if (constraints) {
-
-                        if (l < constraints.minX) {
-                            l = constraints.minX;
-                        }
-
-                        if (l > constraints.maxX) {
-                            l = constraints.maxX;
-                        }
-
-                        if (t < constraints.minY) {
-                            t = constraints.minY;
-                        }
-
-                        if (t > constraints.maxY) {
-                            t = constraints.maxY;
-                        }
-                    }
-                }
-
-                geom.relativePosition(elm, {
-                    left: l,
-                    top: t
-                })
-
-                e.preventDefault();
-                if (movingCallback) {
-                    movingCallback(e);
-                }
-            },
-
-            stop = function(e) {
-                updateWithTouchData(e);
-
-                eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
-
-                noder.remove(overlayDiv);
-
-                if (stoppedCallback) {
-                    stoppedCallback(e);
-                }
-            };
-
-        eventer.on(handleEl, "mousedown touchstart", start);
-
-        return {
-            // destroys the dragger.
-            remove: function() {
-                eventer.off(handleEl);
-            }
-        }
-    }
-
-    function mover(){
-      return mover;
-    }
-
-    langx.mixin(mover, {
-
-        movable: movable
-
-    });
-
-    return interact.mover = mover;
-});
-
-define('skylark-utils/finder',[
-    "skylark-utils-dom/finder"
-], function(finder) {
-    return finder;
-});
-
 define('skylark-utils-dom/fx',[
-    "./skylark",
+    "./dom",
     "./langx",
     "./browser",
     "./geom",
     "./styler",
     "./eventer"
-], function(skylark, langx, browser, geom, styler, eventer) {
+], function(dom, langx, browser, geom, styler, eventer) {
     var animationName,
         animationDuration,
         animationTiming,
@@ -7792,10 +7670,10 @@ define('skylark-utils-dom/fx',[
         toggle: toggle
     });
 
-    return skylark.fx = fx;
+    return dom.fx = fx;
 });
 define('skylark-utils-dom/query',[
-    "./skylark",
+    "./dom",
     "./langx",
     "./noder",
     "./datax",
@@ -7804,7 +7682,7 @@ define('skylark-utils-dom/query',[
     "./geom",
     "./styler",
     "./fx"
-], function(skylark, langx, noder, datax, eventer, finder, geom, styler, fx) {
+], function(dom, langx, noder, datax, eventer, finder, geom, styler, fx) {
     var some = Array.prototype.some,
         push = Array.prototype.push,
         every = Array.prototype.every,
@@ -7849,10 +7727,10 @@ define('skylark-utils-dom/query',[
         return function() {
             var self = this,
                 params = slice.call(arguments);
-            var result = $.map(self, function(elem, idx) {
+            var result = langx.map(self, function(elem, idx) {
                 return func.apply(context, [elem].concat(params));
             });
-            return $(uniq(result));
+            return query(uniq(result));
         }
     }
 
@@ -8369,12 +8247,23 @@ define('skylark-utils-dom/query',[
 
             scrollLeft: wrapper_value(geom.scrollLeft, geom),
 
-            position: function() {
+            position: function(options) {
                 if (!this.length) return
 
-                var elem = this[0];
+                if (options) {
+                    if (options.of && options.of.length) {
+                        options = langx.clone(options);
+                        options.of = options.of[0];
+                    }
+                    return this.each( function() {
+                        geom.posit(this,options);
+                    });
+                } else {
+                    var elem = this[0];
 
-                return geom.relativePosition(elem);
+                    return geom.relativePosition(elem);
+
+                }             
             },
 
             offsetParent: wrapper_map(geom.offsetParent, geom)
@@ -8448,7 +8337,6 @@ define('skylark-utils-dom/query',[
         $.fn.innerWidth = wrapper_value(geom.clientWidth, geom, geom.clientWidth);
 
         $.fn.innerHeight = wrapper_value(geom.clientHeight, geom, geom.clientHeight);
-
 
         var traverseNode = noder.traverse;
 
@@ -8542,17 +8430,15 @@ define('skylark-utils-dom/query',[
 
         $.fn.trigger = wrapper_every_act(eventer.trigger, eventer);
 
-
         ('focusin focusout focus blur load resize scroll unload click dblclick ' +
             'mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave ' +
-            'change select keydown keypress keyup error').split(' ').forEach(function(event) {
+            'change select keydown keypress keyup error transitionEnd').split(' ').forEach(function(event) {
             $.fn[event] = function(data, callback) {
                 return (0 in arguments) ?
                     this.on(event, data, callback) :
                     this.trigger(event)
             }
         });
-
 
         $.fn.one = function(event, selector, data, callback) {
             if (!langx.isString(selector) && !langx.isFunction(callback)) {
@@ -8582,6 +8468,24 @@ define('skylark-utils-dom/query',[
         $.fn.slideDown = wrapper_every_act(fx.slideDown, fx);
         $.fn.slideToggle = wrapper_every_act(fx.slideToggle, fx);
         $.fn.slideUp = wrapper_every_act(fx.slideUp, fx);
+
+        $.fn.scrollParent = function( includeHidden ) {
+            var position = this.css( "position" ),
+                excludeStaticParent = position === "absolute",
+                overflowRegex = includeHidden ? /(auto|scroll|hidden)/ : /(auto|scroll)/,
+                scrollParent = this.parents().filter( function() {
+                    var parent = $( this );
+                    if ( excludeStaticParent && parent.css( "position" ) === "static" ) {
+                        return false;
+                    }
+                    return overflowRegex.test( parent.css( "overflow" ) + parent.css( "overflow-y" ) +
+                        parent.css( "overflow-x" ) );
+                } ).eq( 0 );
+
+            return position === "fixed" || !scrollParent.length ?
+                $( this[ 0 ].ownerDocument || document ) :
+                scrollParent;
+        };
     })(query);
 
 
@@ -8682,30 +8586,1114 @@ define('skylark-utils-dom/query',[
             return this;
         };
 
+        $.fn.replaceClass = function(newClass, oldClass) {
+            this.removeClass(oldClass);
+            this.addClass(newClass);
+            return this;
+        };
+
+        $.fn.disableSelection = ( function() {
+            var eventType = "onselectstart" in document.createElement( "div" ) ?
+                "selectstart" :
+                "mousedown";
+
+            return function() {
+                return this.on( eventType + ".ui-disableSelection", function( event ) {
+                    event.preventDefault();
+                } );
+            };
+        } )();
+
+        $.fn.enableSelection = function() {
+            return this.off( ".ui-disableSelection" );
+        };
+       
+
     })(query);
 
+    query.fn.plugin = function(name,options) {
+        var args = slice.call( arguments, 1 ),
+            self = this,
+            returnValue = this;
 
-    return skylark.query = query;
+        this.each(function(){
+            returnValue = plugins.instantiate.apply(self,[this,name].concat(args));
+        });
+        return returnValue;
+    };
+
+    return dom.query = query;
 
 });
-define('skylark-utils/query',[
-    "skylark-utils-dom/query"
-], function(query) {
-    return query;
-});
+define('skylark-utils-dom/elmx',[
+    "./dom",
+    "./langx",
+    "./datax",
+    "./eventer",
+    "./finder",
+    "./fx",
+    "./geom",
+    "./noder",
+    "./styler"
+], function(dom, langx, datax, eventer, finder, fx, geom, noder, styler) {
+    var map = Array.prototype.map,
+        slice = Array.prototype.slice;
+    /*
+     * VisualElement is a skylark class type wrapping a visule dom node,
+     * provides a number of prototype methods and supports chain calls.
+     */
+    var VisualElement = langx.klass({
+        klassName: "VisualElement",
 
-define('skylark-utils-interact/resizer',[
+        "init": function(node) {
+            if (langx.isString(node)) {
+                node = document.getElementById(node);
+            }
+            this.domNode = node;
+        }
+    });
+    /*
+     * the VisualElement object wrapping document.body
+     */
+    var root = new VisualElement(document.body),
+        elmx = function(node) {
+            if (node) {
+                return new VisualElement(node);
+            } else {
+                return root;
+            }
+        };
+    /*
+     * Extend VisualElement prototype with wrapping the specified methods.
+     * @param {ArrayLike} fn
+     * @param {Object} context
+     */
+    function _delegator(fn, context) {
+        return function() {
+            var self = this,
+                elem = self.domNode,
+                ret = fn.apply(context, [elem].concat(slice.call(arguments)));
+
+            if (ret) {
+                if (ret === context) {
+                    return self;
+                } else {
+                    if (ret instanceof HTMLElement) {
+                        ret = new VisualElement(ret);
+                    } else if (langx.isArrayLike(ret)) {
+                        ret = map.call(ret, function(el) {
+                            if (el instanceof HTMLElement) {
+                                return new VisualElement(ret);
+                            } else {
+                                return el;
+                            }
+                        })
+                    }
+                }
+            }
+            return ret;
+        };
+    }
+
+    langx.mixin(elmx, {
+        batch: function(nodes, action, args) {
+            nodes.forEach(function(node) {
+                var elm = (node instanceof VisualElement) ? node : elmx(node);
+                elm[action].apply(elm, args);
+            });
+
+            return this;
+        },
+
+        root: new VisualElement(document.body),
+
+        VisualElement: VisualElement,
+
+        partial: function(name, fn) {
+            var props = {};
+
+            props[name] = fn;
+
+            VisualElement.partial(props);
+        },
+
+        delegate: function(names, context) {
+            var props = {};
+
+            names.forEach(function(name) {
+                props[name] = _delegator(context[name], context);
+            });
+
+            VisualElement.partial(props);
+        }
+    });
+
+    // from ./datax
+    elmx.delegate([
+        "attr",
+        "data",
+        "prop",
+        "removeAttr",
+        "removeData",
+        "text",
+        "val"
+    ], datax);
+
+    // from ./eventer
+    elmx.delegate([
+        "off",
+        "on",
+        "one",
+        "shortcuts",
+        "trigger"
+    ], eventer);
+
+    // from ./finder
+    elmx.delegate([
+        "ancestor",
+        "ancestors",
+        "children",
+        "descendant",
+        "find",
+        "findAll",
+        "firstChild",
+        "lastChild",
+        "matches",
+        "nextSibling",
+        "nextSiblings",
+        "parent",
+        "previousSibling",
+        "previousSiblings",
+        "siblings"
+    ], finder);
+
+    /*
+     * find a dom element matched by the specified selector.
+     * @param {String} selector
+     */
+    elmx.find = function(selector) {
+        if (selector === "body") {
+            return this.root;
+        } else {
+            return this.root.descendant(selector);
+        }
+    };
+
+    // from ./fx
+    elmx.delegate([
+        "animate",
+        "fadeIn",
+        "fadeOut",
+        "fadeTo",
+        "fadeToggle",
+        "hide",
+        "scrollToTop",
+        "show",
+        "toggle"
+    ], fx);
+
+
+    // from ./geom
+    elmx.delegate([
+        "borderExtents",
+        "boundingPosition",
+        "boundingRect",
+        "clientHeight",
+        "clientSize",
+        "clientWidth",
+        "contentRect",
+        "height",
+        "marginExtents",
+        "offsetParent",
+        "paddingExtents",
+        "pagePosition",
+        "pageRect",
+        "relativePosition",
+        "relativeRect",
+        "scrollIntoView",
+        "scrollLeft",
+        "scrollTop",
+        "size",
+        "width"
+    ], geom);
+
+    // from ./noder
+    elmx.delegate([
+        "after",
+        "append",
+        "before",
+        "clone",
+        "contains",
+        "contents",
+        "empty",
+        "html",
+        "isChildOf",
+        "ownerDoc",
+        "prepend",
+        "remove",
+        "removeChild",
+        "replace",
+        "reverse",
+        "throb",
+        "traverse",
+        "wrapper",
+        "wrapperInner",
+        "unwrap"
+    ], noder);
+
+    // from ./styler
+    elmx.delegate([
+        "addClass",
+        "className",
+        "css",
+        "hasClass",
+        "hide",
+        "isInvisible",
+        "removeClass",
+        "show",
+        "toggleClass"
+    ], styler);
+
+    // properties
+
+    var properties = [ 'position', 'left', 'top', 'right', 'bottom', 'width', 'height', 'border', 'borderLeft',
+    'borderTop', 'borderRight', 'borderBottom', 'borderColor', 'display', 'overflow', 'margin', 'marginLeft', 'marginTop', 'marginRight', 'marginBottom', 'padding', 'paddingLeft', 'paddingTop', 'paddingRight', 'paddingBottom', 'color',
+    'background', 'backgroundColor', 'opacity', 'fontSize', 'fontWeight', 'textAlign', 'textDecoration', 'textTransform', 'cursor', 'zIndex' ];
+
+    properties.forEach( function ( property ) {
+
+        var method = property;
+
+        VisualElement.prototype[method ] = function (value) {
+
+            this.css( property, value );
+
+            return this;
+
+        };
+
+    });
+
+    // events
+    var events = [ 'keyUp', 'keyDown', 'mouseOver', 'mouseOut', 'click', 'dblClick', 'change' ];
+
+    events.forEach( function ( event ) {
+
+        var method = event;
+
+        VisualElement.prototype[method ] = function ( callback ) {
+
+            this.on( event.toLowerCase(), callback);
+
+            return this;
+        };
+
+    });
+
+
+    return dom.elmx = elmx;
+});
+define('skylark-utils-dom/plugins',[
+    "./dom",
+    "./langx",
+    "./noder",
+    "./datax",
+    "./eventer",
+    "./finder",
+    "./geom",
+    "./styler",
+    "./fx",
+    "./query",
+    "./elmx"
+], function(dom, langx, noder, datax, eventer, finder, geom, styler, fx, $, elmx) {
+    "use strict";
+
+	var slice = Array.prototype.slice,
+        concat = Array.prototype.concat,
+        pluginKlasses = {};
+
+
+    /*
+     * Register a plugin type
+     */
+    function register( pluginKlass,shortcut) {
+        var name = pluginKlass.prototype.pluginName;
+        
+        pluginKlasses[name] = pluginKlass;
+
+        if (shortcut) {
+            elmx.partial(shortcut,$.fn[shortcut] = function(options) {
+                var args = slice.call(arguments,0);
+                args.unshift(name);
+                return this.plugin.apply(this,args);
+            });
+        }
+    }
+
+    /*
+     * Create or get a plugin instance assocated with the element,
+     * also you can execute the plugin method directory;
+     */
+    function instantiate(elm,pluginName,options) {
+
+        var pluginInstance = datax.data( elm, pluginName );
+
+        if (options === "instance") {
+            return pluginInstance;
+        }
+
+        var isMethodCall = typeof options === "string",
+            args = slice.call( arguments, 2 ),
+            returnValue = this;
+
+        if ( isMethodCall ) {
+            var methodName = options;
+
+            if ( !pluginInstance ) {
+                return langx.error( "cannot call methods on " + pluginName +
+                    " prior to initialization; " +
+                    "attempted to call method '" + methodName + "'" );
+            }
+
+            if ( !langx.isFunction( pluginInstance[ methodName ] ) || methodName.charAt( 0 ) === "_" ) {
+                return langx.error( "no such method '" + methodName + "' for " + pluginName +
+                    " plugin instance" );
+            }
+
+            return pluginInstance[ methodName ].apply( pluginInstance, args );
+
+        } else {
+            // Allow multiple hashes to be passed on init
+            if ( args.length ) {
+                options = langx.mixin.apply( langx, [{},options ].concat( args ) );
+            }
+
+            if ( pluginInstance ) {
+                pluginInstance.option( options || {} );
+            } else {
+                var pluginKlass = pluginKlasses[pluginName]; 
+                datax.data( elm, pluginName, new pluginKlass(elm,options));
+            }
+        }
+
+        return returnValue;
+    }
+
+    var Plugin =   langx.Evented.inherit({
+        klassName: "Plugin",
+
+        _construct : function(elm,options) {
+           this._elm = elm;
+           this._initOptions(options);
+        },
+
+        _initOptions : function(options) {
+          var ctor = this.constructor,
+              cache = ctor.cache = ctor.cache || {},
+              defaults = cache.defaults;
+          if (!defaults) {
+            var  ctors = [];
+            do {
+              ctors.unshift(ctor);
+              if (ctor === Plugin) {
+                break;
+              }
+              ctor = ctor.superclass;
+            } while (ctor);
+
+            defaults = cache.defaults = {};
+            for (var i=0;i<ctors.length;i++) {
+              ctor = ctors[i];
+              if (ctor.prototype.hasOwnProperty("options")) {
+                langx.mixin(defaults,ctor.prototype.options);
+              }
+            }
+          }
+          return this.options = langx.mixin({},defaults,options);
+        },
+
+
+        destroy: function() {
+            var that = this;
+
+            this._destroy();
+            // We can probably remove the unbind calls in 2.0
+            // all event bindings should go through this._on()
+            datax.removeData(this._elm,this.pluginName );
+        },
+
+        _destroy: langx.noop,
+
+        _delay: function( handler, delay ) {
+            function handlerProxy() {
+                return ( typeof handler === "string" ? instance[ handler ] : handler )
+                    .apply( instance, arguments );
+            }
+            var instance = this;
+            return setTimeout( handlerProxy, delay || 0 );
+        },
+
+        option: function( key, value ) {
+            var options = key;
+            var parts;
+            var curOption;
+            var i;
+
+            if ( arguments.length === 0 ) {
+
+                // Don't return a reference to the internal hash
+                return langx.mixin( {}, this.options );
+            }
+
+            if ( typeof key === "string" ) {
+
+                // Handle nested keys, e.g., "foo.bar" => { foo: { bar: ___ } }
+                options = {};
+                parts = key.split( "." );
+                key = parts.shift();
+                if ( parts.length ) {
+                    curOption = options[ key ] = langx.mixin( {}, this.options[ key ] );
+                    for ( i = 0; i < parts.length - 1; i++ ) {
+                        curOption[ parts[ i ] ] = curOption[ parts[ i ] ] || {};
+                        curOption = curOption[ parts[ i ] ];
+                    }
+                    key = parts.pop();
+                    if ( arguments.length === 1 ) {
+                        return curOption[ key ] === undefined ? null : curOption[ key ];
+                    }
+                    curOption[ key ] = value;
+                } else {
+                    if ( arguments.length === 1 ) {
+                        return this.options[ key ] === undefined ? null : this.options[ key ];
+                    }
+                    options[ key ] = value;
+                }
+            }
+
+            this._setOptions( options );
+
+            return this;
+        },
+
+        _setOptions: function( options ) {
+            var key;
+
+            for ( key in options ) {
+                this._setOption( key, options[ key ] );
+            }
+
+            return this;
+        },
+
+        _setOption: function( key, value ) {
+
+            this.options[ key ] = value;
+
+            return this;
+        }
+
+    });
+
+    $.fn.plugin = function(name,options) {
+        var args = slice.call( arguments, 1 ),
+            self = this,
+            returnValue = this;
+
+        this.each(function(){
+            returnValue = instantiate.apply(self,[this,name].concat(args));
+        });
+        return returnValue;
+    };
+
+    elmx.partial("plugin",function(name,options) {
+        var args = slice.call( arguments, 1 );
+        return instantiate.apply(this,[this,name].concat(args));
+    }); 
+
+
+    function plugins() {
+        return plugins;
+    }
+     
+    langx.mixin(plugins, {
+        instantiate : instantiate,
+    	
+        Plugin : Plugin,
+
+        register : register
+
+    });
+
+    return plugins;
+});
+define('skylark-utils-interact/ddmanager',[
     "./interact",
-    "skylark-utils/langx",
-    "skylark-utils/noder",
-    "skylark-utils/datax",
-    "skylark-utils/finder",
-    "skylark-utils/geom",
-    "skylark-utils/eventer",
-    "./mover",
-    "skylark-utils/styler",
-    "skylark-utils/query"
-],function(interact, langx,noder,datax,finder,geom,eventer,mover,styler,$){
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/finder",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler"
+], function(interact, langx, noder, datax, finder, geom, eventer, styler) {
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height;
+
+
+    var DndManager = interact.DndManager = langx.Evented.inherit({
+        klassName: "DndManager",
+
+        init: function() {
+
+        },
+
+        prepare: function(draggable) {
+            var e = eventer.create("preparing", {
+                dragSource: draggable.dragSource,
+                dragHandle: draggable.dragHandle
+            });
+            draggable.trigger(e);
+            draggable.dragSource = e.dragSource;
+        },
+
+        start: function(draggable, event) {
+
+            var p = geom.pagePosition(draggable.dragSource);
+            this.draggingOffsetX = parseInt(event.pageX - p.left);
+            this.draggingOffsetY = parseInt(event.pageY - p.top)
+
+            var e = eventer.create("started", {
+                elm: draggable.elm,
+                dragSource: draggable.dragSource,
+                dragHandle: draggable.dragHandle,
+                ghost: null,
+
+                transfer: {}
+            });
+
+            draggable.trigger(e);
+
+
+            this.dragging = draggable;
+
+            if (draggable.draggingClass) {
+                styler.addClass(draggable.dragSource, draggable.draggingClass);
+            }
+
+            this.draggingGhost = e.ghost;
+            if (!this.draggingGhost) {
+                this.draggingGhost = draggable.elm;
+            }
+
+            this.draggingTransfer = e.transfer;
+            if (this.draggingTransfer) {
+
+                langx.each(this.draggingTransfer, function(key, value) {
+                    event.dataTransfer.setData(key, value);
+                });
+            }
+
+            event.dataTransfer.setDragImage(this.draggingGhost, this.draggingOffsetX, this.draggingOffsetY);
+
+            event.dataTransfer.effectAllowed = "copyMove";
+
+            var e1 = eventer.create("dndStarted", {
+                elm: e.elm,
+                dragSource: e.dragSource,
+                dragHandle: e.dragHandle,
+                ghost: e.ghost,
+                transfer: e.transfer
+            });
+
+            this.trigger(e1);
+        },
+
+        over: function() {
+
+        },
+
+        end: function(dropped) {
+            var dragging = this.dragging;
+            if (dragging) {
+                if (dragging.draggingClass) {
+                    styler.removeClass(dragging.dragSource, dragging.draggingClass);
+                }
+            }
+
+            var e = eventer.create("dndEnded", {});
+            this.trigger(e);
+
+
+            this.dragging = null;
+            this.draggingTransfer = null;
+            this.draggingGhost = null;
+            this.draggingOffsetX = null;
+            this.draggingOffsetY = null;
+        }
+    });
+
+    var manager = new DndManager();
+
+
+    return manager;
+});
+define('skylark-utils-interact/Draggable',[
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/finder",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/plugins",
+    "./interact",
+    "./ddmanager"
+], function(langx, noder, datax, finder, geom, eventer, styler, plugins, interact,manager) {
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height;
+
+
+
+    var Draggable = plugins.Plugin.inherit({
+        klassName: "Draggable",
+        
+        pluginName : "lark.draggable",
+
+        options : {
+            draggingClass : "dragging"
+        },
+
+        _construct: function(elm, options) {
+            this.overrided(elm,options);
+
+            var self = this,
+                options = this.options;
+
+            self.draggingClass = options.draggingClass;
+
+            ["preparing", "started", "ended", "moving"].forEach(function(eventName) {
+                if (langx.isFunction(options[eventName])) {
+                    self.on(eventName, options[eventName]);
+                }
+            });
+
+
+            eventer.on(elm, {
+                "mousedown": function(e) {
+                    var options = self.options;
+                    if (options.handle) {
+                        self.dragHandle = finder.closest(e.target, options.handle);
+                        if (!self.dragHandle) {
+                            return;
+                        }
+                    }
+                    if (options.source) {
+                        self.dragSource = finder.closest(e.target, options.source);
+                    } else {
+                        self.dragSource = self._elm;
+                    }
+                    manager.prepare(self);
+                    if (self.dragSource) {
+                        datax.attr(self.dragSource, "draggable", 'true');
+                    }
+                },
+
+                "mouseup": function(e) {
+                    if (self.dragSource) {
+                        //datax.attr(self.dragSource, "draggable", 'false');
+                        self.dragSource = null;
+                        self.dragHandle = null;
+                    }
+                },
+
+                "dragstart": function(e) {
+                    datax.attr(self.dragSource, "draggable", 'false');
+                    manager.start(self, e);
+                },
+
+                "dragend": function(e) {
+                    eventer.stop(e);
+
+                    if (!manager.dragging) {
+                        return;
+                    }
+
+                    manager.end(false);
+                }
+            });
+
+        }
+
+    });
+
+    plugins.register(Draggable,"draggable");
+
+    return interact.Draggable = Draggable;
+});
+define('skylark-utils-interact/Droppable',[
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/finder",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/plugins",
+    "./interact",
+    "./ddmanager"
+], function(langx, noder, datax, finder, geom, eventer, styler, plugins, interact,manager) {
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height;
+
+
+    var Droppable = plugins.Plugin.inherit({
+        klassName: "Droppable",
+
+        pluginName : "lark.droppable",
+
+        options : {
+            draggingClass : "dragging"
+        },
+
+        _construct: function(elm, options) {
+            this.overrided(elm,options);
+
+            var self = this,
+                options = self.options,
+                draggingClass = options.draggingClass,
+                hoverClass,
+                activeClass,
+                acceptable = true;
+
+            ["started", "entered", "leaved", "dropped", "overing"].forEach(function(eventName) {
+                if (langx.isFunction(options[eventName])) {
+                    self.on(eventName, options[eventName]);
+                }
+            });
+
+            eventer.on(elm, {
+                "dragover": function(e) {
+                    e.stopPropagation()
+
+                    if (!acceptable) {
+                        return
+                    }
+
+                    var e2 = eventer.create("overing", {
+                        overElm: e.target,
+                        transfer: manager.draggingTransfer,
+                        acceptable: true
+                    });
+                    self.trigger(e2);
+
+                    if (e2.acceptable) {
+                        e.preventDefault() // allow drop
+
+                        e.dataTransfer.dropEffect = "copyMove";
+                    }
+
+                },
+
+                "dragenter": function(e) {
+                    var options = self.options,
+                        elm = self._elm;
+
+                    var e2 = eventer.create("entered", {
+                        transfer: manager.draggingTransfer
+                    });
+
+                    self.trigger(e2);
+
+                    e.stopPropagation()
+
+                    if (hoverClass && acceptable) {
+                        styler.addClass(elm, hoverClass)
+                    }
+                },
+
+                "dragleave": function(e) {
+                    var options = self.options,
+                        elm = self._elm;
+                    if (!acceptable) return false
+
+                    var e2 = eventer.create("leaved", {
+                        transfer: manager.draggingTransfer
+                    });
+
+                    self.trigger(e2);
+
+                    e.stopPropagation()
+
+                    if (hoverClass && acceptable) {
+                        styler.removeClass(elm, hoverClass);
+                    }
+                },
+
+                "drop": function(e) {
+                    var options = self.options,
+                        elm = self._elm;
+
+                    eventer.stop(e); // stops the browser from redirecting.
+
+                    if (!manager.dragging) return
+
+                    // manager.dragging.elm.removeClass('dragging');
+
+                    if (hoverClass && acceptable) {
+                        styler.addClass(elm, hoverClass)
+                    }
+
+                    var e2 = eventer.create("dropped", {
+                        transfer: manager.draggingTransfer
+                    });
+
+                    self.trigger(e2);
+
+                    manager.end(true)
+                }
+            });
+
+            manager.on("dndStarted", function(e) {
+                var e2 = eventer.create("started", {
+                    transfer: manager.draggingTransfer,
+                    acceptable: false
+                });
+
+                self.trigger(e2);
+
+                acceptable = e2.acceptable;
+                hoverClass = e2.hoverClass;
+                activeClass = e2.activeClass;
+
+                if (activeClass && acceptable) {
+                    styler.addClass(elm, activeClass);
+                }
+
+            }).on("dndEnded", function(e) {
+                var e2 = eventer.create("ended", {
+                    transfer: manager.draggingTransfer,
+                    acceptable: false
+                });
+
+                self.trigger(e2);
+
+                if (hoverClass && acceptable) {
+                    styler.removeClass(elm, hoverClass);
+                }
+                if (activeClass && acceptable) {
+                    styler.removeClass(elm, activeClass);
+                }
+
+                acceptable = false;
+                activeClass = null;
+                hoverClass = null;
+            });
+
+        }
+    });
+
+    plugins.register(Droppable,"droppable");
+
+    return interact.Droppable = Droppable;
+});
+define('skylark-utils-interact/Movable',[
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/plugins",
+    "./interact"
+],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height,
+        some = Array.prototype.some,
+        map = Array.prototype.map;
+
+    var Movable = plugins.Plugin.inherit({
+        klassName: "Movable",
+
+        pluginName : "lark.movable",
+
+
+        _construct : function (elm, options) {
+            this.overrided(elm,options);
+
+
+
+            function updateWithTouchData(e) {
+                var keys, i;
+
+                if (e.changedTouches) {
+                    keys = "screenX screenY pageX pageY clientX clientY".split(' ');
+                    for (i = 0; i < keys.length; i++) {
+                        e[keys[i]] = e.changedTouches[0][keys[i]];
+                    }
+                }
+            }
+
+            options = this.options;
+            var handleEl = options.handle || elm,
+                auto = options.auto === false ? false : true,
+                constraints = options.constraints,
+                overlayDiv,
+                doc = options.document || document,
+                downButton,
+                start,
+                stop,
+                drag,
+                startX,
+                startY,
+                originalPos,
+                size,
+                startedCallback = options.started,
+                movingCallback = options.moving,
+                stoppedCallback = options.stopped,
+
+                start = function(e) {
+                    var docSize = geom.getDocumentSize(doc),
+                        cursor;
+
+                    updateWithTouchData(e);
+
+                    e.preventDefault();
+                    downButton = e.button;
+                    //handleEl = getHandleEl();
+                    startX = e.screenX;
+                    startY = e.screenY;
+
+                    originalPos = geom.relativePosition(elm);
+                    size = geom.size(elm);
+
+                    // Grab cursor from handle so we can place it on overlay
+                    cursor = styler.css(handleEl, "curosr");
+
+                    overlayDiv = noder.createElement("div");
+                    styler.css(overlayDiv, {
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: docSize.width,
+                        height: docSize.height,
+                        zIndex: 0x7FFFFFFF,
+                        opacity: 0.0001,
+                        cursor: cursor
+                    });
+                    noder.append(doc.body, overlayDiv);
+
+                    eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
+
+                    if (startedCallback) {
+                        startedCallback(e);
+                    }
+                },
+
+                move = function(e) {
+                    updateWithTouchData(e);
+
+                    if (e.button !== 0) {
+                        return stop(e);
+                    }
+
+                    e.deltaX = e.screenX - startX;
+                    e.deltaY = e.screenY - startY;
+
+                    if (auto) {
+                        var l = originalPos.left + e.deltaX,
+                            t = originalPos.top + e.deltaY;
+                        if (constraints) {
+
+                            if (l < constraints.minX) {
+                                l = constraints.minX;
+                            }
+
+                            if (l > constraints.maxX) {
+                                l = constraints.maxX;
+                            }
+
+                            if (t < constraints.minY) {
+                                t = constraints.minY;
+                            }
+
+                            if (t > constraints.maxY) {
+                                t = constraints.maxY;
+                            }
+                        }
+                    }
+
+                    geom.relativePosition(elm, {
+                        left: l,
+                        top: t
+                    })
+
+                    e.preventDefault();
+                    if (movingCallback) {
+                        movingCallback(e);
+                    }
+                },
+
+                stop = function(e) {
+                    updateWithTouchData(e);
+
+                    eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
+
+                    noder.remove(overlayDiv);
+
+                    if (stoppedCallback) {
+                        stoppedCallback(e);
+                    }
+                };
+
+            eventer.on(handleEl, "mousedown touchstart", start);
+
+            this._handleEl = handleEl;
+
+        },
+
+        remove : function() {
+            eventer.off(this._handleEl);
+        }
+    });
+
+    plugins.register(Movable,"movable");
+
+    return interact.Movable = Movable;
+});
+
+define('skylark-utils-interact/Resizable',[
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/finder",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/query",
+    "skylark-utils-dom/plugins",
+    "./interact",
+    "./Movable"
+],function(langx,noder,datax,finder,geom,eventer,styler,$,plugins,interact,Movable){
     var on = eventer.on,
         off = eventer.off,
         attr = datax.attr,
@@ -8717,10 +9705,12 @@ define('skylark-utils-interact/resizer',[
         map = Array.prototype.map;
 
 
+    var Resizable = plugins.Plugin.inherit({
+        klassName: "Resizable",
 
-    function resizable(elm, params) {
-
-        var defaultOptions = {
+        "pluginName" : "lark.resizable",
+        
+        options : {
             // prevents browser level actions like forward back gestures
             touchActionNone: true,
 
@@ -8736,96 +9726,88 @@ define('skylark-utils-interact/resizer',[
                 grabber: "",
                 selector: true
             }
-        };
+        },
 
-        params = params || {};
-        var handle = params.handle || {},
-            handleEl,
-            direction = params.direction || defaultOptions.direction,
-            startSize,
-            currentSize,
-            startedCallback = params.started,
-            movingCallback = params.moving,
-            stoppedCallback = params.stopped;
+        _construct :function (elm, options) {
+            this.overrided(elm,options);
 
-        if (langx.isString(handle)) {
-            handleEl = finder.find(elm,handle);
-        } else if (langx.isHtmlNode(handle)) {
-            handleEl = handle;
-        }
-        mover.movable(handleEl,{
-            auto : false,
-            started : function(e) {
-                startSize = geom.size(elm);
-                if (startedCallback) {
-                    startedCallback(e);
-                }
-            },
-            moving : function(e) {
-                currentSize = {
-                };
-                if (direction.left || direction.right) {
-                    currentSize.width = startSize.width + e.deltaX;
-                } else {
-                    currentSize.width = startSize.width;
-                }
 
-                if (direction.top || direction.bottom) {
-                    currentSize.height = startSize.height + e.deltaY;
-                } else {
-                    currentSize.height = startSize.height;
-                }
+            options = this.options;
+            var handle = options.handle || {},
+                handleEl,
+                direction = options.direction,
+                startSize,
+                currentSize,
+                startedCallback = options.started,
+                movingCallback = options.moving,
+                stoppedCallback = options.stopped;
 
-                geom.size(elm,currentSize);
-
-                if (movingCallback) {
-                    movingCallback(e);
-                }
-            },
-            stopped: function(e) {
-                if (stoppedCallback) {
-                    stoppedCallback(e);
-                }                
+            if (langx.isString(handle)) {
+                handleEl = finder.find(elm,handle);
+            } else if (langx.isHtmlNode(handle)) {
+                handleEl = handle;
             }
-        });
-        
-        return {
-            // destroys the dragger.
-            remove: function() {
-                eventer.off(handleEl);
-            }
+            Movable(handleEl,{
+                auto : false,
+                started : function(e) {
+                    startSize = geom.size(elm);
+                    if (startedCallback) {
+                        startedCallback(e);
+                    }
+                },
+                moving : function(e) {
+                    currentSize = {
+                    };
+                    if (direction.left || direction.right) {
+                        currentSize.width = startSize.width + e.deltaX;
+                    } else {
+                        currentSize.width = startSize.width;
+                    }
+
+                    if (direction.top || direction.bottom) {
+                        currentSize.height = startSize.height + e.deltaY;
+                    } else {
+                        currentSize.height = startSize.height;
+                    }
+
+                    geom.size(elm,currentSize);
+
+                    if (movingCallback) {
+                        movingCallback(e);
+                    }
+                },
+                stopped: function(e) {
+                    if (stoppedCallback) {
+                        stoppedCallback(e);
+                    }                
+                }
+            });
+            
+            this._handleEl = handleEl;
+        },
+
+        // destroys the dragger.
+        remove: function() {
+            eventer.off(this._handleEl);
         }
-
-    }
-
-    $.fn.resizable = function(params) {
-        this.each(function(el){
-            resizable(this,params);
-        });
-    };
-
-    function resizer(){
-      return resizer;
-    }
-
-    langx.mixin(resizer, {
-        resizable: resizable
     });
 
-    return interact.resizer = resizer;
+    plugins.register(Resizable,"resizable");
+
+    return interact.Resizable = Resizable;
 });
 
-define('skylark-utils-interact/selector',[
+define('skylark-utils-interact/Selectable',[
+    "skylark-langx/langx",
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/query",
     "./interact",
-    "skylark-utils/langx",
-    "skylark-utils/noder",
-    "skylark-utils/datax",
-    "skylark-utils/geom",
-    "skylark-utils/eventer",
-    "./mover",
-    "skylark-utils/styler",
-    "skylark-utils/query"
-],function(interact, langx,noder,datax,geom,eventer,mover,styler,$){
+    "./Movable"
+],function(langx,noder,datax,geom,eventer,styler,$,interact,Movable){
     var on = eventer.on,
         off = eventer.off,
         attr = datax.attr,
@@ -8917,8 +9899,6 @@ define('skylark-utils-interact/selector',[
         resizingCallback,
         stoppedCallback;
 
-
-
     function init (options) {
         options = options || {};
         classPrefix = options.classPrefix || "";
@@ -8942,7 +9922,7 @@ define('skylark-utils-interact/selector',[
         for (var n in handlers) {
             var handler = handlers[n];
             noder.append(container,handler);
-            mover.movable(handler,{
+            Movable(handler,{
                 auto : false,
                 started : started,
                 moving : resizing,
@@ -9039,956 +10019,24 @@ define('skylark-utils-interact/selector',[
 
     });
 
-    return interact.selector = selector;
+    return interact.Selectable = selector;
 });
 
-define('skylark-utils/dnd',[
-    "./skylark",
-    "./langx",
-    "./noder",
-    "./datax",
-    "./finder",
-    "./geom",
-    "./eventer",
-    "./styler"
-], function(skylark, langx, noder, datax, finder, geom, eventer, styler) {
-    var on = eventer.on,
-        off = eventer.off,
-        attr = datax.attr,
-        removeAttr = datax.removeAttr,
-        offset = geom.pagePosition,
-        addClass = styler.addClass,
-        height = geom.height;
-
-
-    var DndManager = langx.Evented.inherit({
-        klassName: "DndManager",
-
-        init: function() {
-
-        },
-
-        prepare: function(draggable) {
-            var e = eventer.create("preparing", {
-                dragSource: draggable.dragSource,
-                dragHandle: draggable.dragHandle
-            });
-            draggable.trigger(e);
-            draggable.dragSource = e.dragSource;
-        },
-
-        start: function(draggable, event) {
-
-            var p = geom.pagePosition(draggable.dragSource);
-            this.draggingOffsetX = parseInt(event.pageX - p.left);
-            this.draggingOffsetY = parseInt(event.pageY - p.top)
-
-            var e = eventer.create("started", {
-                elm: draggable.elm,
-                dragSource: draggable.dragSource,
-                dragHandle: draggable.dragHandle,
-                ghost: null,
-
-                transfer: {}
-            });
-
-            draggable.trigger(e);
-
-
-            this.dragging = draggable;
-
-            if (draggable.draggingClass) {
-                styler.addClass(draggable.dragSource, draggable.draggingClass);
-            }
-
-            this.draggingGhost = e.ghost;
-            if (!this.draggingGhost) {
-                this.draggingGhost = draggable.elm;
-            }
-
-            this.draggingTransfer = e.transfer;
-            if (this.draggingTransfer) {
-
-                langx.each(this.draggingTransfer, function(key, value) {
-                    event.dataTransfer.setData(key, value);
-                });
-            }
-
-            event.dataTransfer.setDragImage(this.draggingGhost, this.draggingOffsetX, this.draggingOffsetY);
-
-            event.dataTransfer.effectAllowed = "copyMove";
-
-            var e1 = eventer.create("dndStarted", {
-                elm: e.elm,
-                dragSource: e.dragSource,
-                dragHandle: e.dragHandle,
-                ghost: e.ghost,
-                transfer: e.transfer
-            });
-
-            this.trigger(e1);
-        },
-
-        over: function() {
-
-        },
-
-        end: function(dropped) {
-            var dragging = this.dragging;
-            if (dragging) {
-                if (dragging.draggingClass) {
-                    styler.removeClass(dragging.dragSource, dragging.draggingClass);
-                }
-            }
-
-            var e = eventer.create("dndEnded", {});
-            this.trigger(e);
-
-
-            this.dragging = null;
-            this.draggingTransfer = null;
-            this.draggingGhost = null;
-            this.draggingOffsetX = null;
-            this.draggingOffsetY = null;
-        }
-    });
-
-    var manager = new DndManager(),
-        draggingHeight,
-        placeholders = [];
-
-
-
-    var Draggable = langx.Evented.inherit({
-        klassName: "Draggable",
-
-        init: function(elm, params) {
-            var self = this;
-
-            self.elm = elm;
-            self.draggingClass = params.draggingClass || "dragging",
-                self.params = langx.clone(params);
-
-            ["preparing", "started", "ended", "moving"].forEach(function(eventName) {
-                if (langx.isFunction(params[eventName])) {
-                    self.on(eventName, params[eventName]);
-                }
-            });
-
-
-            eventer.on(elm, {
-                "mousedown": function(e) {
-                    var params = self.params;
-                    if (params.handle) {
-                        self.dragHandle = finder.closest(e.target, params.handle);
-                        if (!self.dragHandle) {
-                            return;
-                        }
-                    }
-                    if (params.source) {
-                        self.dragSource = finder.closest(e.target, params.source);
-                    } else {
-                        self.dragSource = self.elm;
-                    }
-                    manager.prepare(self);
-                    if (self.dragSource) {
-                        datax.attr(self.dragSource, "draggable", 'true');
-                    }
-                },
-
-                "mouseup": function(e) {
-                    if (self.dragSource) {
-                        //datax.attr(self.dragSource, "draggable", 'false');
-                        self.dragSource = null;
-                        self.dragHandle = null;
-                    }
-                },
-
-                "dragstart": function(e) {
-                    datax.attr(self.dragSource, "draggable", 'false');
-                    manager.start(self, e);
-                },
-
-                "dragend": function(e) {
-                    eventer.stop(e);
-
-                    if (!manager.dragging) {
-                        return;
-                    }
-
-                    manager.end(false);
-                }
-            });
-
-        }
-
-    });
-
-
-    var Droppable = langx.Evented.inherit({
-        klassName: "Droppable",
-
-        init: function(elm, params) {
-            var self = this,
-                draggingClass = params.draggingClass || "dragging",
-                hoverClass,
-                activeClass,
-                acceptable = true;
-
-            self.elm = elm;
-            self._params = params;
-
-            ["started", "entered", "leaved", "dropped", "overing"].forEach(function(eventName) {
-                if (langx.isFunction(params[eventName])) {
-                    self.on(eventName, params[eventName]);
-                }
-            });
-
-            eventer.on(elm, {
-                "dragover": function(e) {
-                    e.stopPropagation()
-
-                    if (!acceptable) {
-                        return
-                    }
-
-                    var e2 = eventer.create("overing", {
-                        overElm: e.target,
-                        transfer: manager.draggingTransfer,
-                        acceptable: true
-                    });
-                    self.trigger(e2);
-
-                    if (e2.acceptable) {
-                        e.preventDefault() // allow drop
-
-                        e.dataTransfer.dropEffect = "copyMove";
-                    }
-
-                },
-
-                "dragenter": function(e) {
-                    var params = self._params,
-                        elm = self.elm;
-
-                    var e2 = eventer.create("entered", {
-                        transfer: manager.draggingTransfer
-                    });
-
-                    self.trigger(e2);
-
-                    e.stopPropagation()
-
-                    if (hoverClass && acceptable) {
-                        styler.addClass(elm, hoverClass)
-                    }
-                },
-
-                "dragleave": function(e) {
-                    var params = self._params,
-                        elm = self.elm;
-                    if (!acceptable) return false
-
-                    var e2 = eventer.create("leaved", {
-                        transfer: manager.draggingTransfer
-                    });
-
-                    self.trigger(e2);
-
-                    e.stopPropagation()
-
-                    if (hoverClass && acceptable) {
-                        styler.removeClass(elm, hoverClass);
-                    }
-                },
-
-                "drop": function(e) {
-                    var params = self._params,
-                        elm = self.elm;
-
-                    eventer.stop(e); // stops the browser from redirecting.
-
-                    if (!manager.dragging) return
-
-                    // manager.dragging.elm.removeClass('dragging');
-
-                    if (hoverClass && acceptable) {
-                        styler.addClass(elm, hoverClass)
-                    }
-
-                    var e2 = eventer.create("dropped", {
-                        transfer: manager.draggingTransfer
-                    });
-
-                    self.trigger(e2);
-
-                    manager.end(true)
-                }
-            });
-
-            manager.on("dndStarted", function(e) {
-                var e2 = eventer.create("started", {
-                    transfer: manager.draggingTransfer,
-                    acceptable: false
-                });
-
-                self.trigger(e2);
-
-                acceptable = e2.acceptable;
-                hoverClass = e2.hoverClass;
-                activeClass = e2.activeClass;
-
-                if (activeClass && acceptable) {
-                    styler.addClass(elm, activeClass);
-                }
-
-            }).on("dndEnded", function(e) {
-                var e2 = eventer.create("ended", {
-                    transfer: manager.draggingTransfer,
-                    acceptable: false
-                });
-
-                self.trigger(e2);
-
-                if (hoverClass && acceptable) {
-                    styler.removeClass(elm, hoverClass);
-                }
-                if (activeClass && acceptable) {
-                    styler.removeClass(elm, activeClass);
-                }
-
-                acceptable = false;
-                activeClass = null;
-                hoverClass = null;
-            });
-
-        }
-    });
-
-
-    /*   
-     * Make the specified element be in a moveable state.
-     * @param {HTMLElement} elm  
-     * @param { } params
-     */
-    function draggable(elm, params) {
-        return new Draggable(elm, params);
-    }
-
-    /*   
-     * Make the specified element be in a droppable state.
-     * @param {HTMLElement} elm  
-     * @param { } params
-     */
-    function droppable(elm, params) {
-        return new Droppable(elm, params);
-    }
-
-
-    function dnd() {
-        return dnd;
-    }
-
-    langx.mixin(dnd, {
-        //params ： {
-        //  target : Element or string or function
-        //  handle : Element
-        //  copy : boolean
-        //  placeHolder : "div"
-        //  hoverClass : "hover"
-        //  start : function
-        //  enter : function
-        //  over : function
-        //  leave : function
-        //  drop : function
-        //  end : function
-        //
-        //
-        //}
-        draggable: draggable,
-
-        //params ： {
-        //  accept : string or function
-        //  placeHolder
-        //
-        //
-        //
-        //}
-        droppable: droppable,
-
-        manager: manager
-
-
-    });
-
-    return skylark.dnd = dnd;
-});
-define('skylark-utils-dom/velm',[
-    "./skylark",
-    "./langx",
-    "./datax",
-    "./eventer",
-    "./finder",
-    "./fx",
-    "./geom",
-    "./noder",
-    "./styler"
-], function(skylark, langx, datax, eventer, finder, fx, geom, noder, styler) {
-    var map = Array.prototype.map,
-        slice = Array.prototype.slice;
-    /*
-     * VisualElement is a skylark class type wrapping a visule dom node,provides a number of prototype methods and supports chain calls.
-     */
-    var VisualElement = langx.klass({
-        klassName: "VisualElement",
-
-        "init": function(node) {
-            if (langx.isString(node)) {
-                node = document.getElementById(node);
-            }
-            this.domNode = node;
-        }
-    });
-    /*
-     * the VisualElement object wrapping document.body
-     */
-    var root = new VisualElement(document.body),
-        velm = function(node) {
-            if (node) {
-                return new VisualElement(node);
-            } else {
-                return root;
-            }
-        };
-    /*
-     * Extend VisualElement prototype with wrapping the specified methods.
-     * @param {ArrayLike} fn
-     * @param {Object} context
-     */
-    function _delegator(fn, context) {
-        return function() {
-            var self = this,
-                elem = self.domNode,
-                ret = fn.apply(context, [elem].concat(slice.call(arguments)));
-
-            if (ret) {
-                if (ret === context) {
-                    return self;
-                } else {
-                    if (ret instanceof HTMLElement) {
-                        ret = new VisualElement(ret);
-                    } else if (langx.isArrayLike(ret)) {
-                        ret = map.call(ret, function(el) {
-                            if (el instanceof HTMLElement) {
-                                return new VisualElement(ret);
-                            } else {
-                                return el;
-                            }
-                        })
-                    }
-                }
-            }
-            return ret;
-        };
-    }
-
-    langx.mixin(velm, {
-        batch: function(nodes, action, args) {
-            nodes.forEach(function(node) {
-                var elm = (node instanceof VisualElement) ? node : velm(node);
-                elm[action].apply(elm, args);
-            });
-
-            return this;
-        },
-
-        root: new VisualElement(document.body),
-
-        VisualElement: VisualElement,
-
-        partial: function(name, fn) {
-            var props = {};
-
-            props[name] = fn;
-
-            VisualElement.partial(props);
-        },
-
-        delegate: function(names, context) {
-            var props = {};
-
-            names.forEach(function(name) {
-                props[name] = _delegator(context[name], context);
-            });
-
-            VisualElement.partial(props);
-        }
-    });
-
-    // from ./datax
-    velm.delegate([
-        "attr",
-        "data",
-        "prop",
-        "removeAttr",
-        "removeData",
-        "text",
-        "val"
-    ], datax);
-
-    // from ./dnd
-    velm.delegate([
-        "draggable",
-        "droppable"
-    ], dnd);
-
-
-    // from ./eventer
-    velm.delegate([
-        "off",
-        "on",
-        "one",
-        "shortcuts",
-        "trigger"
-    ], eventer);
-
-    // from ./finder
-    velm.delegate([
-        "ancestor",
-        "ancestors",
-        "children",
-        "descendant",
-        "find",
-        "findAll",
-        "firstChild",
-        "lastChild",
-        "matches",
-        "nextSibling",
-        "nextSiblings",
-        "parent",
-        "previousSibling",
-        "previousSiblings",
-        "siblings"
-    ], finder);
-
-    /*
-     * find a dom element matched by the specified selector.
-     * @param {String} selector
-     */
-    velm.find = function(selector) {
-        if (selector === "body") {
-            return this.root;
-        } else {
-            return this.root.descendant(selector);
-        }
-    };
-
-    // from ./fx
-    velm.delegate([
-        "animate",
-        "fadeIn",
-        "fadeOut",
-        "fadeTo",
-        "fadeToggle",
-        "hide",
-        "scrollToTop",
-        "show",
-        "toggle"
-    ], fx);
-
-
-    // from ./geom
-    velm.delegate([
-        "borderExtents",
-        "boundingPosition",
-        "boundingRect",
-        "clientHeight",
-        "clientSize",
-        "clientWidth",
-        "contentRect",
-        "height",
-        "marginExtents",
-        "offsetParent",
-        "paddingExtents",
-        "pagePosition",
-        "pageRect",
-        "relativePosition",
-        "relativeRect",
-        "scrollIntoView",
-        "scrollLeft",
-        "scrollTop",
-        "size",
-        "width"
-    ], geom);
-
-    // from ./noder
-    velm.delegate([
-        "after",
-        "append",
-        "before",
-        "clone",
-        "contains",
-        "contents",
-        "empty",
-        "html",
-        "isChildOf",
-        "ownerDoc",
-        "prepend",
-        "remove",
-        "removeChild",
-        "replace",
-        "reverse",
-        "throb",
-        "traverse",
-        "wrapper",
-        "wrapperInner",
-        "unwrap"
-    ], noder);
-
-    // from ./styler
-    velm.delegate([
-        "addClass",
-        "className",
-        "css",
-        "hasClass",
-        "hide",
-        "isInvisible",
-        "removeClass",
-        "show",
-        "toggleClass"
-    ], styler);
-
-    // properties
-
-    var properties = [ 'position', 'left', 'top', 'right', 'bottom', 'width', 'height', 'border', 'borderLeft',
-    'borderTop', 'borderRight', 'borderBottom', 'borderColor', 'display', 'overflow', 'margin', 'marginLeft', 'marginTop', 'marginRight', 'marginBottom', 'padding', 'paddingLeft', 'paddingTop', 'paddingRight', 'paddingBottom', 'color',
-    'background', 'backgroundColor', 'opacity', 'fontSize', 'fontWeight', 'textAlign', 'textDecoration', 'textTransform', 'cursor', 'zIndex' ];
-
-    properties.forEach( function ( property ) {
-
-        var method = property;
-
-        VisualElement.prototype[method ] = function (value) {
-
-            this.css( property, value );
-
-            return this;
-
-        };
-
-    });
-
-    // events
-    var events = [ 'keyUp', 'keyDown', 'mouseOver', 'mouseOut', 'click', 'dblClick', 'change' ];
-
-    events.forEach( function ( event ) {
-
-        var method = event;
-
-        VisualElement.prototype[method ] = function ( callback ) {
-
-            this.on( event.toLowerCase(), callback);
-
-            return this;
-        };
-
-    });
-
-    return skylark.velm = velm;
-});
-define('skylark-utils/velm',[
-    "skylark-utils-dom/velm"
-], function(velm) {
-    return velm;
-});
-
-define('skylark-utils/widgets',[
-    "./skylark",
-    "./langx",
-    "./noder",
-    "./datax",
-    "./styler",
-    "./geom",
-    "./eventer",
-    "./query",
-    "./velm"
-], function(skylark,langx,noder, datax, styler, geom, eventer,query,velm) {
-	// Cached regex to split keys for `delegate`.
-	var delegateEventSplitter = /^(\S+)\s*(.*)$/,
-		slice = Array.prototype.slice;
-
-
-	function bridge( name, object ) {
-		var fullName = object.prototype.widgetFullName || name,
-			fn = {};
-
-		function _delegate (isQuery) {
-
-		}
-
-		fn[name] = function( options ) {
-			var isMethodCall = typeof options === "string";
-			var args = slice.call( arguments, 1 );
-			var returnValue = this;
-
-			if ( isMethodCall ) {
-
-				// If this is an empty collection, we need to have the instance method
-				// return undefined instead of the jQuery instance
-				if ( !this.length && options === "instance" ) {
-					returnValue = undefined;
-				} else {
-					this.each( function() {
-						var methodValue;
-						var instance = datax.data( this, fullName );
-
-						if ( options === "instance" ) {
-							returnValue = instance;
-							return false;
-						}
-
-						if ( !instance ) {
-							return $.error( "cannot call methods on " + name +
-								" prior to initialization; " +
-								"attempted to call method '" + options + "'" );
-						}
-
-						if ( !langx.isFunction( instance[ options ] ) || options.charAt( 0 ) === "_" ) {
-							return $.error( "no such method '" + options + "' for " + name +
-								" widget instance" );
-						}
-
-						methodValue = instance[ options ].apply( instance, args );
-
-						if ( methodValue !== instance && methodValue !== undefined ) {
-							returnValue = methodValue && methodValue.jquery ?
-								returnValue.pushStack( methodValue.get() ) :
-								methodValue;
-							return false;
-						}
-					} );
-				}
-			} else {
-
-				// Allow multiple hashes to be passed on init
-				if ( args.length ) {
-					options = $.widget.extend.apply( null, [ options ].concat( args ) );
-				}
-
-				this.each( function() {
-					var instance = datax.data( this, fullName );
-					if ( instance ) {
-						instance.option( options || {} );
-						if ( instance._init ) {
-							instance._init();
-						}
-					} else {
-						datax.data( this, fullName, new object( options, this ) );
-					}
-				} );
-			}
-
-			return returnValue;
-		};
-	};
-
-	function widgets() {
-	    return widgets;
-	}
-
-	var Widget = langx.Evented.inherit({
-	    init :function(el,options) {
-	    	//for supporting init(options,el)
-	        if (langx.isHtmlNode(options)) {
-	        	var _t = el,
-	        		options = el;
-	            el = options;
-	        }
-	        if (langx.isHtmlNode(el)) { 
-	        	this.el = el;
-	    	} else {
-	    		this.el = null;
-	    	}
-	        if (options) {
-	            langx.mixin(this,options);
-	        }
-	        if (!this.cid) {
-	            this.cid = langx.uniqueId('w');
-	        }
-	        this._ensureElement();
-	    },
-
-	    // The default `tagName` of a View's element is `"div"`.
-	    tagName: 'div',
-
-	    // query delegate for element lookup, scoped to DOM elements within the
-	    // current view. This should be preferred to global lookups where possible.
-	    $: function(selector) {
-	      return this.$el.find(selector);
-	    },
-
-	    // **render** is the core function that your view should override, in order
-	    // to populate its element (`this.el`), with the appropriate HTML. The
-	    // convention is for **render** to always return `this`.
-	    render: function() {
-	      return this;
-	    },
-
-	    // Remove this view by taking the element out of the DOM, and removing any
-	    // applicable Backbone.Events listeners.
-	    remove: function() {
-	      this._removeElement();
-	      this.unlistenTo();
-	      return this;
-	    },
-
-	    // Remove this view's element from the document and all event listeners
-	    // attached to it. Exposed for subclasses using an alternative DOM
-	    // manipulation API.
-	    _removeElement: function() {
-	      this.$el.remove();
-	    },
-
-	    // Change the view's element (`this.el` property) and re-delegate the
-	    // view's events on the new element.
-	    setElement: function(element) {
-	      this.undelegateEvents();
-	      this._setElement(element);
-	      this.delegateEvents();
-	      return this;
-	    },
-
-	    // Creates the `this.el` and `this.$el` references for this view using the
-	    // given `el`. `el` can be a CSS selector or an HTML string, a jQuery
-	    // context or an element. Subclasses can override this to utilize an
-	    // alternative DOM manipulation API and are only required to set the
-	    // `this.el` property.
-	    _setElement: function(el) {
-	      this.$el = widgets.$(el);
-	      this.el = this.$el[0];
-	    },
-
-	    // Set callbacks, where `this.events` is a hash of
-	    //
-	    // *{"event selector": "callback"}*
-	    //
-	    //     {
-	    //       'mousedown .title':  'edit',
-	    //       'click .button':     'save',
-	    //       'click .open':       function(e) { ... }
-	    //     }
-	    //
-	    // pairs. Callbacks will be bound to the view, with `this` set properly.
-	    // Uses event delegation for efficiency.
-	    // Omitting the selector binds the event to `this.el`.
-	    delegateEvents: function(events) {
-	      events || (events = langx.result(this, 'events'));
-	      if (!events) return this;
-	      this.undelegateEvents();
-	      for (var key in events) {
-	        var method = events[key];
-	        if (!langx.isFunction(method)) method = this[method];
-	        if (!method) continue;
-	        var match = key.match(delegateEventSplitter);
-	        this.delegate(match[1], match[2], langx.proxy(method, this));
-	      }
-	      return this;
-	    },
-
-	    // Add a single event listener to the view's element (or a child element
-	    // using `selector`). This only works for delegate-able events: not `focus`,
-	    // `blur`, and not `change`, `submit`, and `reset` in Internet Explorer.
-	    delegate: function(eventName, selector, listener) {
-	      this.$el.on(eventName + '.delegateEvents' + this.uid, selector, listener);
-	      return this;
-	    },
-
-	    // Clears all callbacks previously bound to the view by `delegateEvents`.
-	    // You usually don't need to use this, but may wish to if you have multiple
-	    // Backbone views attached to the same DOM element.
-	    undelegateEvents: function() {
-	      if (this.$el) this.$el.off('.delegateEvents' + this.uid);
-	      return this;
-	    },
-
-	    // A finer-grained `undelegateEvents` for removing a single delegated event.
-	    // `selector` and `listener` are both optional.
-	    undelegate: function(eventName, selector, listener) {
-	      this.$el.off(eventName + '.delegateEvents' + this.uid, selector, listener);
-	      return this;
-	    },
-
-	    // Produces a DOM element to be assigned to your view. Exposed for
-	    // subclasses using an alternative DOM manipulation API.
-	    _createElement: function(tagName,attrs) {
-	      return noder.createElement(tagName,attrs);
-	    },
-
-	    // Ensure that the View has a DOM element to render into.
-	    // If `this.el` is a string, pass it through `$()`, take the first
-	    // matching element, and re-assign it to `el`. Otherwise, create
-	    // an element from the `id`, `className` and `tagName` properties.
-	    _ensureElement: function() {
-	      if (!this.el) {
-	        var attrs = langx.mixin({}, langx.result(this, 'attributes'));
-	        if (this.id) attrs.id = langx.result(this, 'id');
-	        if (this.className) attrs['class'] = langx.result(this, 'className');
-	        this.setElement(this._createElement(langx.result(this, 'tagName'),attrs));
-	        this._setAttributes(attrs);
-	      } else {
-	        this.setElement(langx.result(this, 'el'));
-	      }
-	    },
-
-	    // Set attributes from a hash on this view's element.  Exposed for
-	    // subclasses using an alternative DOM manipulation API.
-	    _setAttributes: function(attributes) {
-	      this.$el.attr(attributes);
-	    },
-
-	    // Translation function, gets the message key to be translated
-	    // and an object with context specific data as arguments:
-	    i18n: function (message, context) {
-	        message = (this.messages && this.messages[message]) || message.toString();
-	        if (context) {
-	            langx.each(context, function (key, value) {
-	                message = message.replace('{' + key + '}', value);
-	            });
-	        }
-	        return message;
-	    },
-
-		});
-
-	function defineWidgetClass(name,base,prototype) {
-
-	};
-
-	langx.mixin(widgets, {
-		$ : query,
-
-		define : defineWidgetClass,
-		Widget : Widget
-	});
-
-
-	return skylark.widgets = widgets;
-});
-
-define('skylark-utils-interact/sorter',[
+define('skylark-utils-interact/Sortable',[
     "./interact",
     "skylark-langx/langx",
-    "skylark-utils/noder",
-    "skylark-utils/datax",
-    "skylark-utils/geom",
-    "skylark-utils/eventer",
-    "skylark-utils/styler",
-    "skylark-utils/dnd",
-    "skylark-utils/query",
-    "skylark-utils/widgets",
-    "./mover",
-    "./resizer"
-],function(interact, langx,noder,datax,geom,eventer,styler,dnd,$,widgets,mover,resizer){
+    "skylark-utils-dom/noder",
+    "skylark-utils-dom/datax",
+    "skylark-utils-dom/geom",
+    "skylark-utils-dom/eventer",
+    "skylark-utils-dom/styler",
+    "skylark-utils-dom/query",
+    "skylark-utils-dom/plugins",
+    "./Draggable",
+    "./Droppable",
+    "./Movable",
+    "./Resizable"
+],function(interact, langx,noder,datax,geom,eventer,styler,$,plugins,Draggable,Droppable, Movable,Resizable){
     var on = eventer.on,
         off = eventer.off,
         attr = datax.attr,
@@ -9999,7 +10047,7 @@ define('skylark-utils-interact/sorter',[
         some = Array.prototype.some,
         map = Array.prototype.map;
 
-    var Sorter = widgets.Widget.inherit({
+    var Sorter = plugins.Plugin.inherit({
         "klassName" : "Sorter",
 
         enable : function() {
@@ -10019,132 +10067,120 @@ define('skylark-utils-interact/sorter',[
     var dragging, placeholders = $();
 
 
-    /*
-     * @param {HTMLElement} container  the element to use as a sortable container
-     * @param {Object} options  options object
-     * @param {String} [options.items = ""] 
-     * @param {Object} [options.connectWith =] the selector to create connected lists
-     * @param {Object} [options
-     * @param {Object} [options
-     */
-    function sortable(container,options) {
-        options = langx.mixin({
+    var Sortable = plugins.Plugin.inherit({
+        klassName: "Sortable",
+
+        pluginName : "lark.sortable",
+        
+        options : {
             connectWith: false,
             placeholder: null,
             placeholderClass: 'sortable-placeholder',
             draggingClass: 'sortable-dragging',
             items : null
+        },
 
-        },options);
+        /*
+         * @param {HTMLElement} container  the element to use as a sortable container
+         * @param {Object} options  options object
+         * @param {String} [options.items = ""] 
+         * @param {Object} [options.connectWith =] the selector to create connected lists
+         * @param {Object} [options
+         * @param {Object} [options
+         */
+        _construct : function (container,options) {
+            this.overrided(container,options);
 
-        var isHandle, index, 
-            $container = $(container), 
-            $items = $container.children(options.items);
-        var placeholder = $(options.placeholder || noder.createElement(/^(ul|ol)$/i.test(container.tagName) ? 'li' : 'div',{
-            "class" : options.placeholderClass
-        }));
+            options = this.options;
 
-        dnd.draggable(container,{
-            source : options.items,
-            handle : options.handle,
-            draggingClass : options.draggingClass,
-            preparing : function(e) {
-                //e.dragSource = e.handleElm;
-            },
-            started :function(e) {
-                e.ghost = e.dragSource;
-                e.transfer = {
-                    "text": "dummy"
-                };
-                index = (dragging = $(e.dragSource)).index();
-            },
-            ended : function(e) {
-                if (!dragging) {
-                    return;
-                }
-                dragging.show();
-                placeholders.detach();
-                if (index != dragging.index()) {
-                    dragging.parent().trigger('sortupdate', {item: dragging});
-                }
-                dragging = null;                
-            }
+            var isHandle, index, 
+                $container = $(container), 
+                $items = $container.children(options.items);
+            var placeholder = $(options.placeholder || noder.createElement(/^(ul|ol)$/i.test(container.tagName) ? 'li' : 'div',{
+                "class" : options.placeholderClass
+            }));
 
-        });
-
-        
-        dnd.droppable(container,{
-            started: function(e) {
-                e.acceptable = true;
-                e.activeClass = "active";
-                e.hoverClass = "over";
-            },
-            overing : function(e) {
-                if ($items.is(e.overElm)) {
-                    if (options.forcePlaceholderSize) {
-                        placeholder.height(dragging.outerHeight());
+            Draggable(container,{
+                source : options.items,
+                handle : options.handle,
+                draggingClass : options.draggingClass,
+                preparing : function(e) {
+                    //e.dragSource = e.handleElm;
+                },
+                started :function(e) {
+                    e.ghost = e.dragSource;
+                    e.transfer = {
+                        "text": "dummy"
+                    };
+                    index = (dragging = $(e.dragSource)).index();
+                },
+                ended : function(e) {
+                    if (!dragging) {
+                        return;
                     }
-                    dragging.hide();
-                    $(e.overElm)[placeholder.index() < $(e.overElm).index() ? 'after' : 'before'](placeholder);
-                    placeholders.not(placeholder).detach();
-                } else if (!placeholders.is(e.overElm) && !$(e.overElm).children(options.items).length) {
+                    dragging.show();
                     placeholders.detach();
-                    $(e.overElm).append(placeholder);
-                }                
-            },
-            dropped : function(e) {
-                placeholders.filter(':visible').after(dragging);
-                dragging.show();
-                placeholders.detach();
+                    if (index != dragging.index()) {
+                        dragging.parent().trigger('sortupdate', {item: dragging});
+                    }
+                    dragging = null;                
+                }
 
-                dragging = null;                
-              }
-        });
+            });
 
-        $container.data('items', options.items)
-        placeholders = placeholders.add(placeholder);
-        if (options.connectWith) {
-            $(options.connectWith).add(this).data('connectWith', options.connectWith);
-        }
-        
-        return {
-            remove : function() {
+            
+            Droppable(container,{
+                started: function(e) {
+                    e.acceptable = true;
+                    e.activeClass = "active";
+                    e.hoverClass = "over";
+                },
+                overing : function(e) {
+                    if ($items.is(e.overElm)) {
+                        if (options.forcePlaceholderSize) {
+                            placeholder.height(dragging.outerHeight());
+                        }
+                        dragging.hide();
+                        $(e.overElm)[placeholder.index() < $(e.overElm).index() ? 'after' : 'before'](placeholder);
+                        placeholders.not(placeholder).detach();
+                    } else if (!placeholders.is(e.overElm) && !$(e.overElm).children(options.items).length) {
+                        placeholders.detach();
+                        $(e.overElm).append(placeholder);
+                    }                
+                },
+                dropped : function(e) {
+                    placeholders.filter(':visible').after(dragging);
+                    dragging.show();
+                    placeholders.detach();
 
+                    dragging = null;                
+                  }
+            });
+
+            $container.data('items', options.items)
+            placeholders = placeholders.add(placeholder);
+            if (options.connectWith) {
+                $(options.connectWith).add(this).data('connectWith', options.connectWith);
             }
+            
         }
-    }
-
-
-    $.fn.sortable = function(options) {
-        options = langx.mixin({
-            connectWith: false
-        }, options);
-        return this.each(function() {
-            sortable(this,options);
-        });
-    };
-
-    function sorter(){
-      return sorter;
-    }
-
-    langx.mixin(sorter, {
-
-        sortable : sortable
-
     });
 
-    return interact.sorter = sorter;
+    plugins.register(Sortable,"sortable");
+
+    return interact.Sortable = Sortable;
 });
 
 define('skylark-utils-interact/main',[
-    "skylark-utils/skylark",
-    "./mover",
-    "./resizer",
-    "./selector",
-    "./sorter"
-], function(skylark) {
-    return skylark;
+    "./interact",
+    "./Draggable",
+    "./Droppable",
+    "./Movable",
+    "./Resizable",
+    "./Selectable",
+    "./Sortable"
+], function(interact) {
+    return interact;
 })
 ;
 define('skylark-utils-interact', ['skylark-utils-interact/main'], function (main) { return main; });
