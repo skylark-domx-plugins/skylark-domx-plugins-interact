@@ -1,5 +1,5 @@
-# skylark-utils-interact
-The interact features enhancement for skylark utils.
+# skylark-domx-interact
+The interact features enhancement for dom api.
 
 ## Dependences
 
@@ -15,10 +15,10 @@ builds are in the directory dist.
 
 |                      | build                                      | Description              |
 | -------------------- | ------------------------------------------ | ------------------------ |
-| full                 | skylark-utils-interact-all.js              | included dependences     |
-| only                 | skylark-utils-interact.js                  | not included dependences |
-| full （development） | uncompressed/skylark-utils-interact-all.js | included dependences     |
-| only （development） | uncompressed/skylark-utils-interact.js     | not included dependences |
+| full                 | skylark-domx-interact-all.js              | included dependences     |
+| only                 | skylark-domx-interact.js                  | not included dependences |
+| full （development） | uncompressed/skylark-domx-interact-all.js | included dependences     |
+| only （development） | uncompressed/skylark-domx-interact.js     | not included dependences |
 
 Please use the "full" version when using this library alone, and use the "only" version when using other skylark libraries.
 
@@ -26,9 +26,9 @@ Please use the "full" version when using this library alone, and use the "only" 
 
 You can get the latest version in many different ways:
 
-- Downloading [a ZIP file from master](https://github.com/skylarkutils/skylark-utils-interact/archive/master.zip)
-- Cloning using Git: `git clone https://github.com/skylarkutils/skylark-utils-interact.git`
-- Installing via NPM: `npm install https://github.com/skylarkutils/skylark-utils-interact.git#master --save`
+- Downloading [a ZIP file from master](https://github.com/skylark-domx/skylark-domx-interact/archive/master.zip)
+- Cloning using Git: `git clone https://github.com/skylark-domx/skylark-domx-interact.git`
+- Installing via NPM: `npm install https://github.com/skylark-domx/skylark-domx-interact.git#master --save`
 
 ## Building 
 
