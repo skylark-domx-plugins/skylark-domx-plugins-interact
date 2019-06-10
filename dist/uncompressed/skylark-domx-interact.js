@@ -1,5 +1,5 @@
 /**
- * skylark-ui-interact - The interact features enhancement for dom.
+ * skylark-domx-interact - The interact features enhancement for dom.
  * @author Hudaokeji Co.,Ltd
  * @version v0.9.0
  * @link www.skylarkjs.org
@@ -86,7 +86,7 @@
 
 })(function(define,require) {
 
-define('skylark-ui-interact/interact',[
+define('skylark-domx-interact/interact',[
     "skylark-langx/skylark",
     "skylark-langx/langx"
 ], function(skylark, langx) {
@@ -98,7 +98,7 @@ define('skylark-ui-interact/interact',[
 });
 
 
-define('skylark-ui-interact/ddmanager',[
+define('skylark-domx-interact/ddmanager',[
     "./interact",
     "skylark-langx/langx",
     "skylark-utils-dom/noder",
@@ -214,7 +214,7 @@ define('skylark-ui-interact/ddmanager',[
 
     return manager;
 });
-define('skylark-ui-interact/Draggable',[
+define('skylark-domx-interact/Draggable',[
     "skylark-langx/langx",
     "skylark-utils-dom/noder",
     "skylark-utils-dom/datax",
@@ -312,7 +312,7 @@ define('skylark-ui-interact/Draggable',[
 
     return interact.Draggable = Draggable;
 });
-define('skylark-ui-interact/Droppable',[
+define('skylark-domx-interact/Droppable',[
     "skylark-langx/langx",
     "skylark-utils-dom/noder",
     "skylark-utils-dom/datax",
@@ -483,7 +483,7 @@ define('skylark-ui-interact/Droppable',[
 
     return interact.Droppable = Droppable;
 });
-define('skylark-ui-interact/Movable',[
+define('skylark-domx-interact/Movable',[
     "skylark-langx/langx",
     "skylark-utils-dom/noder",
     "skylark-utils-dom/datax",
@@ -653,7 +653,7 @@ define('skylark-ui-interact/Movable',[
     return interact.Movable = Movable;
 });
 
-define('skylark-ui-interact/Resizable',[
+define('skylark-domx-interact/Resizable',[
     "skylark-langx/langx",
     "skylark-utils-dom/noder",
     "skylark-utils-dom/datax",
@@ -769,7 +769,7 @@ define('skylark-ui-interact/Resizable',[
     return interact.Resizable = Resizable;
 });
 
-define('skylark-ui-interact/Selectable',[
+define('skylark-domx-interact/Selectable',[
     "skylark-langx/langx",
     "skylark-utils-dom/noder",
     "skylark-utils-dom/datax",
@@ -994,7 +994,7 @@ define('skylark-ui-interact/Selectable',[
     return interact.Selectable = selector;
 });
 
-define('skylark-ui-interact/Sortable',[
+define('skylark-domx-interact/Sortable',[
     "./interact",
     "skylark-langx/langx",
     "skylark-utils-dom/noder",
@@ -1143,7 +1143,7 @@ define('skylark-ui-interact/Sortable',[
     return interact.Sortable = Sortable;
 });
 
-define('skylark-ui-interact/main',[
+define('skylark-domx-interact/main',[
     "./interact",
     "./Draggable",
     "./Droppable",
@@ -1155,8 +1155,8 @@ define('skylark-ui-interact/main',[
     return interact;
 })
 ;
-define('skylark-ui-interact', ['skylark-ui-interact/main'], function (main) { return main; });
+define('skylark-domx-interact', ['skylark-domx-interact/main'], function (main) { return main; });
 
 
 },this);
-//# sourceMappingURL=sourcemaps/skylark-ui-interact.js.map
+//# sourceMappingURL=sourcemaps/skylark-domx-interact.js.map

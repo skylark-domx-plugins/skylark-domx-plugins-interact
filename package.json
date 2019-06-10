@@ -1,5 +1,5 @@
 {
-  "name": "skylark-ui-interact",
+  "name": "skylark-domx-interact",
   "version": "0.9.0",
   "description": "The interact features enhancement for dom.",
   "main": "-",
@@ -10,7 +10,7 @@
   "homepage": "www.skylarkjs.org",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/skylarkjs/skylark-ui-interact.git"
+    "url": "git+https://github.com/skylarkjs/skylark-domx-interact.git"
   },
   "keywords": [
     "skylark",
