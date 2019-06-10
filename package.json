@@ -1,7 +1,7 @@
 {
-  "name": "skylark-utils-interact",
+  "name": "skylark-ui-interact",
   "version": "0.9.0",
-  "description": "The interact features enhancement for skylark utils.",
+  "description": "The interact features enhancement for dom.",
   "main": "-",
   "scripts": {
     "build": "sbundle build .",
@@ -10,15 +10,15 @@
   "homepage": "www.skylarkjs.org",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/skylarkjs/skylark-utils-interact.git"
+    "url": "git+https://github.com/skylarkjs/skylark-ui-interact.git"
   },
   "keywords": [
     "skylark",
     "skylarkjs",
     "javacript",
     "library",
-    "utility",
-    "html5"
+    "dnd",
+    "dom"
   ],
   "author": "Hudaokeji Co.,Ltd",
   "license": "MIT",

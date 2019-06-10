@@ -1,5 +1,5 @@
 /**
- * skylark-utils-interact - The interact features enhancement for skylark utils.
+ * skylark-ui-interact - The interact features enhancement for dom.
  * @author Hudaokeji Co.,Ltd
  * @version v0.9.0
  * @link www.skylarkjs.org

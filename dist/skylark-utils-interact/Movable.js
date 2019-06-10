@@ -1,9 +1,0 @@
-/**
- * skylark-utils-interact - The interact features enhancement for skylark utils.
- * @author Hudaokeji Co.,Ltd
- * @version v0.9.0
- * @link www.skylarkjs.org
- * @license MIT
- */
-define(["skylark-langx/langx","skylark-utils-dom/noder","skylark-utils-dom/datax","skylark-utils-dom/geom","skylark-utils-dom/eventer","skylark-utils-dom/styler","skylark-utils-dom/plugins","./interact"],function(e,t,o,n,a,i,s,r){var l=(a.on,a.off,o.attr,o.removeAttr,n.pagePosition,i.addClass,n.height,Array.prototype.some,Array.prototype.map,s.Plugin.inherit({klassName:"Movable",pluginName:"lark.movable",_construct:function(e,o){function s(e){var t,o;if(e.changedTouches)for(t="screenX screenY pageX pageY clientX clientY".split(" "),o=0;o<t.length;o++)e[t[o]]=e.changedTouches[0][t[o]]}this.overrided(e,o),o=this.options;var r,l,u,m,c,d,h,f,p=o.handle||e,v=o.auto!==!1,g=o.constraints,k=o.document||document,y=o.started,X=o.moving,Y=o.stopped,u=function(o){var u,v=n.getDocumentSize(k);s(o),o.preventDefault(),l=o.button,c=o.screenX,d=o.screenY,h=n.relativePosition(e),f=n.size(e),u=i.css(p,"curosr"),r=t.createElement("div"),i.css(r,{position:"absolute",top:0,left:0,width:v.width,height:v.height,zIndex:2147483647,opacity:1e-4,cursor:u}),t.append(k.body,r),a.on(k,"mousemove touchmove",b).on(k,"mouseup touchend",m),y&&y(o)},b=function(t){if(s(t),0!==t.button)return m(t);if(t.deltaX=t.screenX-c,t.deltaY=t.screenY-d,v){var o=h.left+t.deltaX,a=h.top+t.deltaY;g&&(o<g.minX&&(o=g.minX),o>g.maxX&&(o=g.maxX),a<g.minY&&(a=g.minY),a>g.maxY&&(a=g.maxY))}n.relativePosition(e,{left:o,top:a}),t.preventDefault(),X&&X(t)},m=function(e){s(e),a.off(k,"mousemove touchmove",b).off(k,"mouseup touchend",m),t.remove(r),Y&&Y(e)};a.on(p,"mousedown touchstart",u),this._handleEl=p},remove:function(){a.off(this._handleEl)}}));return s.register(l,"movable"),r.Movable=l});
-//# sourceMappingURL=sourcemaps/Movable.js.map
