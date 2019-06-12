@@ -2,10 +2,7 @@ define([
     "skylark-langx/skylark",
     "skylark-langx/langx"
 ], function(skylark, langx) {
-	
-	var interact = skylark.interact = {
-	};
 
-	return interact;
+	return skylark.attach("domx.interact",{});
 });
 
