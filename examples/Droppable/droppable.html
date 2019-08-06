@@ -24,7 +24,7 @@
         packages: [{
             name: "skylark-utils-dom",location: "../../node_modules/skylark-utils-dom/dist/uncompressed/skylark-utils-dom"
         }, {
-            name: "skylark-utils-interact",location: "../../src"
+            name: "skylark-domx-interact",location: "../../src"
         }, {
             name: "skylark-langx",location: "../../node_modules/skylark-langx/dist/uncompressed/skylark-langx"
         }]
@@ -48,8 +48,8 @@
     require([
         "skylark-utils-dom/finder", 
         "skylark-utils-dom/noder",
-        "skylark-utils-interact/Draggable",
-        "skylark-utils-interact/Droppable"
+        "skylark-domx-interact/Draggable",
+        "skylark-domx-interact/Droppable"
     ], function(finder, noder, Draggable, Droppable) {
         var sources = document.querySelector('#sources');
             Draggable(sources,{

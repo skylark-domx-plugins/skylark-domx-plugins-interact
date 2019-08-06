@@ -57,7 +57,7 @@
         packages: [{
             name: "skylark-utils-dom",location: "../../node_modules/skylark-utils-dom/dist/uncompressed/skylark-utils-dom"
         }, {
-            name: "skylark-utils-interact",location: "../../src"
+            name: "skylark-domx-interact",location: "../../src"
         }, {
             name: "skylark-langx",location: "../../node_modules/skylark-langx/dist/uncompressed/skylark-langx"
         }]
@@ -97,7 +97,7 @@
         <div id="moveable3">You can move this paragraph. It is relatively positioned.</div>
     </div>
     <script>
-    require(["skylark-utils-dom/finder","skylark-utils-interact/Movable"], function(finder,Movable) {
+    require(["skylark-utils-dom/finder","skylark-domx-interact/Movable"], function(finder,Movable) {
 
         Movable(finder.byId("moveable1"), {
             handle: finder.byId("handle1")
