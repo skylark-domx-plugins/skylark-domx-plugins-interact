@@ -1,12 +1,12 @@
 define([
     "./interact",
     "skylark-langx/langx",
-    "skylark-utils-dom/noder",
-    "skylark-utils-dom/datax",
-    "skylark-utils-dom/finder",
-    "skylark-utils-dom/geom",
-    "skylark-utils-dom/eventer",
-    "skylark-utils-dom/styler"
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-finder",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler"
 ], function(interact, langx, noder, datax, finder, geom, eventer, styler) {
     var on = eventer.on,
         off = eventer.off,

@@ -1,11 +1,11 @@
 define([
     "skylark-langx/langx",
-    "skylark-utils-dom/noder",
-    "skylark-utils-dom/datax",
-    "skylark-utils-dom/geom",
-    "skylark-utils-dom/eventer",
-    "skylark-utils-dom/styler",
-    "skylark-utils-dom/query",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-query",
     "./interact",
     "./Movable"
 ],function(langx,noder,datax,geom,eventer,styler,$,interact,Movable){

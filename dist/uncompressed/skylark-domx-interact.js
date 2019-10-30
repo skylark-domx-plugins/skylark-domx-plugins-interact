@@ -98,12 +98,12 @@ define('skylark-domx-interact/interact',[
 define('skylark-domx-interact/ddmanager',[
     "./interact",
     "skylark-langx/langx",
-    "skylark-utils-dom/noder",
-    "skylark-utils-dom/datax",
-    "skylark-utils-dom/finder",
-    "skylark-utils-dom/geom",
-    "skylark-utils-dom/eventer",
-    "skylark-utils-dom/styler"
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-finder",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler"
 ], function(interact, langx, noder, datax, finder, geom, eventer, styler) {
     var on = eventer.on,
         off = eventer.off,
@@ -213,13 +213,13 @@ define('skylark-domx-interact/ddmanager',[
 });
 define('skylark-domx-interact/Draggable',[
     "skylark-langx/langx",
-    "skylark-utils-dom/noder",
-    "skylark-utils-dom/datax",
-    "skylark-utils-dom/finder",
-    "skylark-utils-dom/geom",
-    "skylark-utils-dom/eventer",
-    "skylark-utils-dom/styler",
-    "skylark-utils-dom/plugins",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-finder",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-plugins",
     "./interact",
     "./ddmanager"
 ], function(langx, noder, datax, finder, geom, eventer, styler, plugins, interact,manager) {
@@ -311,13 +311,13 @@ define('skylark-domx-interact/Draggable',[
 });
 define('skylark-domx-interact/Droppable',[
     "skylark-langx/langx",
-    "skylark-utils-dom/noder",
-    "skylark-utils-dom/datax",
-    "skylark-utils-dom/finder",
-    "skylark-utils-dom/geom",
-    "skylark-utils-dom/eventer",
-    "skylark-utils-dom/styler",
-    "skylark-utils-dom/plugins",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-finder",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-plugins",
     "./interact",
     "./ddmanager"
 ], function(langx, noder, datax, finder, geom, eventer, styler, plugins, interact,manager) {
@@ -482,12 +482,12 @@ define('skylark-domx-interact/Droppable',[
 });
 define('skylark-domx-interact/Movable',[
     "skylark-langx/langx",
-    "skylark-utils-dom/noder",
-    "skylark-utils-dom/datax",
-    "skylark-utils-dom/geom",
-    "skylark-utils-dom/eventer",
-    "skylark-utils-dom/styler",
-    "skylark-utils-dom/plugins",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-plugins",
     "./interact"
 ],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
     var on = eventer.on,
@@ -652,14 +652,14 @@ define('skylark-domx-interact/Movable',[
 
 define('skylark-domx-interact/Resizable',[
     "skylark-langx/langx",
-    "skylark-utils-dom/noder",
-    "skylark-utils-dom/datax",
-    "skylark-utils-dom/finder",
-    "skylark-utils-dom/geom",
-    "skylark-utils-dom/eventer",
-    "skylark-utils-dom/styler",
-    "skylark-utils-dom/query",
-    "skylark-utils-dom/plugins",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-finder",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-query",
+    "skylark-domx-plugins",
     "./interact",
     "./Movable"
 ],function(langx,noder,datax,finder,geom,eventer,styler,$,plugins,interact,Movable){
@@ -768,12 +768,12 @@ define('skylark-domx-interact/Resizable',[
 
 define('skylark-domx-interact/Selectable',[
     "skylark-langx/langx",
-    "skylark-utils-dom/noder",
-    "skylark-utils-dom/datax",
-    "skylark-utils-dom/geom",
-    "skylark-utils-dom/eventer",
-    "skylark-utils-dom/styler",
-    "skylark-utils-dom/query",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-query",
     "./interact",
     "./Movable"
 ],function(langx,noder,datax,geom,eventer,styler,$,interact,Movable){
@@ -994,13 +994,13 @@ define('skylark-domx-interact/Selectable',[
 define('skylark-domx-interact/Sortable',[
     "./interact",
     "skylark-langx/langx",
-    "skylark-utils-dom/noder",
-    "skylark-utils-dom/datax",
-    "skylark-utils-dom/geom",
-    "skylark-utils-dom/eventer",
-    "skylark-utils-dom/styler",
-    "skylark-utils-dom/query",
-    "skylark-utils-dom/plugins",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-query",
+    "skylark-domx-plugins",
     "./Draggable",
     "./Droppable",
     "./Movable",
