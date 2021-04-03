@@ -1,7 +1,7 @@
 define([
     "skylark-langx/skylark",
-    "skylark-langx/langx"
-], function(skylark, langx) {
+    "./polyfill"
+], function(skylark) {
 
 	return skylark.attach("domx.interact",{});
 });
