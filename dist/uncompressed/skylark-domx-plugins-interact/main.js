@@ -4,8 +4,7 @@ define([
     "./Droppable",
     "./Movable",
     "./Resizable",
-    "./Selectable",
-    "./Sortable"
+    "./Selectable"
 ], function(interact) {
     return interact;
 })
