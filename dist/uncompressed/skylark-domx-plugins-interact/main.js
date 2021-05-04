@@ -1,7 +1,5 @@
 define([
     "./interact",
-    "./Draggable",
-    "./Droppable",
     "./Movable",
     "./Resizable",
     "./Selectable"
