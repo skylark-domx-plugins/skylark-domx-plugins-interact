@@ -30,7 +30,6 @@ define([
         options : {
             // prevents browser level actions like forward back gestures
             touchActionNone: true,
-
             // selector for handle that starts dragging
             handle : {
                 border : {
@@ -65,7 +64,9 @@ define([
 
             constraints : {
                 minWidth : null,
-                minHeight : null
+                minHeight : null,
+                maxWidth : null,
+                maxHeight : null
             }
         },
 
@@ -75,9 +76,7 @@ define([
 
             options = this.options;
             var handle = options.handle || {},
-                handleEl,
-                direction = options.direction,
-                currentSize,
+                constraints = options.constraints || {},
                 startedCallback = options.started,
                 movingCallback = options.moving,
                 stoppedCallback = options.stopped;
@@ -88,7 +87,7 @@ define([
                 handleEl = handle;
             }
 
-            function handleResize(handleEl,dir,minWidth,minHeight) {
+            function handleResize(handleEl,dir) {
                 let  startRect;
 
                 Movable(handleEl,{
@@ -104,20 +103,48 @@ define([
                         };
                         if (dir == "right" || dir == "topRight" || dir == "bottomRight" ) {
                             currentRect.width = startRect.width + e.deltaX;
+                            if (constraints.minWidth && currentRect.width < constraints.minWidth) {
+                                currentRect.width = constraints.minWidth;
+                            }
+                            if (constraints.maxWidth && currentRect.width > constraints.maxWidth) {
+                                currentRect.width = constraints.maxWidth;
+                            }
                         } 
 
                         if (dir == "bottom" || dir == "bottomLeft" || dir == "bottomRight" ) {
                             currentRect.height = startRect.height + e.deltaY;
+                            if (constraints.minHeight && currentRect.height < constraints.minHeight) {
+                                currentRect.height = constraints.minHeight;
+                            }
+                            if (constraints.maxHeight && currentRect.height > constraints.maxHeight) {
+                                currentRect.height = constraints.maxHeight;
+                            }
                         } 
 
                         if (dir == "left" || dir == "topLeft" || dir == "bottomLeft" ) {
                             currentRect.left = startRect.left + e.deltaX;
                             currentRect.width = startRect.width - e.deltaX;
+                            if (constraints.minWidth && currentRect.width < constraints.minWidth) {
+                                currentRect.left = currentRect.left + currentRect.width - constraints.minWidth;
+                                currentRect.width = constraints.minWidth;
+                            }
+                            if (constraints.maxWidth && currentRect.width > constraints.maxWidth) {
+                                currentRect.left = currentRect.left + currentRect.width - constraints.maxWidth;
+                                currentRect.width = constraints.maxWidth;
+                            }
                         } 
 
                         if (dir == "top" || dir == "topLeft" || dir == "topRight" ) {
                             currentRect.top = startRect.top + e.deltaY;
                             currentRect.height = startRect.height - e.deltaY;
+                            if (constraints.minHeight && currentRect.height < constraints.minHeight) {
+                                currentRect.top = currentRect.top + currentRect.height - constraints.minHeight;
+                                currentRect.height = constraints.minHeight;
+                            }
+                            if (constraints.maxHeight && currentRect.height > constraints.maxHeight) {
+                                currentRect.top = currentRect.top + currentRect.height - constraints.maxHeight;
+                                currentRect.height = constraints.maxHeight;
+                            }
                         } 
 
                         geom.relativeRect(elm,currentRect);
