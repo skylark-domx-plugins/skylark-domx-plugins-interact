@@ -40,8 +40,15 @@ define([
                 }
             }
 
+            function updateWithMoveData(e) {
+                e.movable = self;
+                e.moveEl = elm;
+                e.handleEl = handleEl;
+            }
+
             options = this.options;
-            var handleEl = options.handle || elm,
+            var self = this,
+                handleEl = options.handle || elm,
                 auto = options.auto === false ? false : true,
                 constraints = options.constraints,
                 overlayDiv,
@@ -54,6 +61,7 @@ define([
                 startY,
                 originalPos,
                 size,
+                startingCallback = options.starting,
                 startedCallback = options.started,
                 movingCallback = options.moving,
                 stoppedCallback = options.stopped,
@@ -63,8 +71,30 @@ define([
                         cursor;
 
                     updateWithTouchData(e);
+                    updateWithMoveData(e);
+
+                    if (startingCallback) {
+                        var ret = startingCallback(e)
+                        if ( ret === false) {
+                            return;
+                        } else if (langx.isPlainObject(ret)) {
+                            if (ret.constraints) {
+                                constraints = ret.constraints;
+                            }
+                            if (ret.started) {
+                                startedCallback = ret.started;
+                            }
+                            if (ret.moving) {
+                                movingCallback = ret.moving;
+                            }                            
+                            if (ret.stopped) {
+                                stoppedCallback = ret.stopped;
+                            }     
+                        }
+                    }
 
                     e.preventDefault();
+
                     downButton = e.button;
                     //handleEl = getHandleEl();
                     startX = e.screenX;
@@ -98,6 +128,7 @@ define([
 
                 move = function(e) {
                     updateWithTouchData(e);
+                    updateWithMoveData(e);
 
                     if (e.button !== 0) {
                         return stop(e);

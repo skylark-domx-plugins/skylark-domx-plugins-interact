@@ -50,19 +50,7 @@
         font-weight: bold;
     }
     </style>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.3/require.min.js"></script>
-    <script>
-    require.config({
-        baseUrl: "./",
-        packages: [{
-            name: "skylark-utils-dom",location: "../../node_modules/skylark-utils-dom/dist/uncompressed/skylark-utils-dom"
-        }, {
-            name: "skylark-domx-interact",location: "../../src"
-        }, {
-            name: "skylark-langx",location: "../../node_modules/skylark-langx/dist/uncompressed/skylark-langx"
-        }]
-    });
-    </script>
+    <script type="text/javascript" src="../require.js" data-main="../main.js"></script>
 </head>
 
 <body>
@@ -97,14 +85,14 @@
         <div id="moveable3">You can move this paragraph. It is relatively positioned.</div>
     </div>
     <script>
-    require(["skylark-utils-dom/finder","skylark-domx-interact/Movable"], function(finder,Movable) {
-
-        Movable(finder.byId("moveable1"), {
-            handle: finder.byId("handle1")
-        });
-        Movable(finder.byId("moveable2"));
-        Movable(finder.byId("moveable3"));
-    });
+        function initPage(langx,$,interact) {
+            interact.Movable($("#moveable1")[0], {
+                handle: $("#handle1")[0]
+            });
+            interact.Movable($("#moveable2")[0]);
+            interact.Movable($("#moveable3"))[0];
+     
+        }
     </script>
 </body>
 

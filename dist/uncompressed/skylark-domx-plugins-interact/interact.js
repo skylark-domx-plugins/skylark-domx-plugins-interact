@@ -3,6 +3,6 @@ define([
     "./polyfill"
 ], function(skylark) {
 
-	return skylark.attach("domx.interact",{});
+	return skylark.attach("domx.plugins.interact",{});
 });
 

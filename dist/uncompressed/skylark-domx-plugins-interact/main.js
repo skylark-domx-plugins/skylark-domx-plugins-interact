@@ -1,8 +1,8 @@
 define([
     "./interact",
-    "./Movable",
-    "./Resizable",
-    "./Selectable"
+    "./movable",
+    "./resizable",
+    "./selectable"
 ], function(interact) {
     return interact;
 })

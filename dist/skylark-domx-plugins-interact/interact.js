@@ -5,5 +5,5 @@
  * @link www.skylarkjs.org
  * @license MIT
  */
-define(["skylark-langx/skylark","./polyfill"],function(a){return a.attach("domx.interact",{})});
+define(["skylark-langx/skylark","./polyfill"],function(l){return l.attach("domx.plugins.interact",{})});
 //# sourceMappingURL=sourcemaps/interact.js.map
