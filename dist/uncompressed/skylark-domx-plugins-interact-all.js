@@ -18684,7 +18684,7 @@ define('skylark-domx-plugins-interact/movable',[
                     size = geom.size(elm);
 
                     // Grab cursor from handle so we can place it on overlay
-                    cursor = styler.css(handleEl, "curosr");
+                    cursor = styler.css(handleEl, "cursor");
 
                     overlayDiv = noder.createElement("div");
                     styler.css(overlayDiv, {
@@ -18885,7 +18885,7 @@ define('skylark-domx-plugins-interact/Movable',[
                     size = geom.size(elm);
 
                     // Grab cursor from handle so we can place it on overlay
-                    cursor = styler.css(handleEl, "curosr");
+                    cursor = styler.css(handleEl, "cursor");
 
                     overlayDiv = noder.createElement("div");
                     styler.css(overlayDiv, {
@@ -19013,17 +19013,41 @@ define('skylark-domx-plugins-interact/resizable',[
             // prevents browser level actions like forward back gestures
             touchActionNone: true,
 
-            direction : {
-                top: false, 
-                left: false, 
-                right: true, 
-                bottom: true
-            },
             // selector for handle that starts dragging
             handle : {
-                border : true,
-                grabber: "",
+                border : {
+                    directions : {
+                        top: true, //n
+                        left: true, //w
+                        right: true, //e
+                        bottom: true, //s
+                        topLeft : true, // nw
+                        topRight : true, // ne
+                        bottomLeft : true, // sw
+                        bottomRight : true // se                         
+                    },
+                    classes : {
+                        all : "resizable-handle",
+                        top : "resizable-handle-n",
+                        left: "resizable-handle-w",
+                        right: "resizable-handle-e",
+                        bottom: "resizable-handle-s", 
+                        topLeft : "resizable-handle-nw", 
+                        topRight : "resizable-handle-ne",
+                        bottomLeft : "resizable-handle-sw",             
+                        bottomRight : "resizable-handle-se"                         
+                    }
+                },
+                grabber: {
+                    selector : "",
+                    direction : "bottomRight"
+                },
                 selector: true
+            },
+
+            constraints : {
+                minWidth : null,
+                minHeight : null
             }
         },
 
@@ -19035,7 +19059,6 @@ define('skylark-domx-plugins-interact/resizable',[
             var handle = options.handle || {},
                 handleEl,
                 direction = options.direction,
-                startSize,
                 currentSize,
                 startedCallback = options.started,
                 movingCallback = options.moving,
@@ -19046,43 +19069,73 @@ define('skylark-domx-plugins-interact/resizable',[
             } else if (langx.isHtmlNode(handle)) {
                 handleEl = handle;
             }
-            Movable(handleEl,{
-                auto : false,
-                started : function(e) {
-                    startSize = geom.size(elm);
-                    if (startedCallback) {
-                        startedCallback(e);
+
+            function handleResize(handleEl,dir,minWidth,minHeight) {
+                let  startRect;
+
+                Movable(handleEl,{
+                    auto : false,
+                    started : function(e) {
+                        startRect = geom.relativeRect(elm);
+                        if (startedCallback) {
+                            startedCallback(e);
+                        }
+                    },
+                    moving : function(e) {
+                        currentRect = {
+                        };
+                        if (dir == "right" || dir == "topRight" || dir == "bottomRight" ) {
+                            currentRect.width = startRect.width + e.deltaX;
+                        } 
+
+                        if (dir == "bottom" || dir == "bottomLeft" || dir == "bottomRight" ) {
+                            currentRect.height = startRect.height + e.deltaY;
+                        } 
+
+                        if (dir == "left" || dir == "topLeft" || dir == "bottomLeft" ) {
+                            currentRect.left = startRect.left + e.deltaX;
+                            currentRect.width = startRect.width - e.deltaX;
+                        } 
+
+                        if (dir == "top" || dir == "topLeft" || dir == "topRight" ) {
+                            currentRect.top = startRect.top + e.deltaY;
+                            currentRect.height = startRect.height - e.deltaY;
+                        } 
+
+                        geom.relativeRect(elm,currentRect);
+
+                        if (movingCallback) {
+                            movingCallback(e);
+                        }
+                    },
+                    stopped: function(e) {
+                        if (stoppedCallback) {
+                            stoppedCallback(e);
+                        }                
                     }
-                },
-                moving : function(e) {
-                    currentSize = {
-                    };
-                    if (direction.left || direction.right) {
-                        currentSize.width = startSize.width + e.deltaX;
-                    } else {
-                        currentSize.width = startSize.width;
+                });
+            }
+
+            if (handle && handle.border) {
+                let borders = []
+                for (var dir in handle.border.directions) {
+                    if (handle.border.directions[dir]) {
+                        let handleEl = noder.createElement("div",{
+                            "className": handle.border.classes.all + " " + handle.border.classes[dir],
+                            "direction" : dir
+                        },elm);   
+                        handleResize(handleEl,dir) ; 
+
                     }
 
-                    if (direction.top || direction.bottom) {
-                        currentSize.height = startSize.height + e.deltaY;
-                    } else {
-                        currentSize.height = startSize.height;
-                    }
-
-                    geom.size(elm,currentSize);
-
-                    if (movingCallback) {
-                        movingCallback(e);
-                    }
-                },
-                stopped: function(e) {
-                    if (stoppedCallback) {
-                        stoppedCallback(e);
-                    }                
                 }
-            });
-            
-            this._handleEl = handleEl;
+            }
+
+            if (handle && handle.grabber && handle.grabber.selector) {
+                 let handleEl = finder.find(elm,handle.grabber.selector);
+                 handleResize(handleEl,handle.grabber.direction) ; 
+            }
+
         },
 
         // destroys the dragger.

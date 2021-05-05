@@ -104,7 +104,7 @@ define([
                     size = geom.size(elm);
 
                     // Grab cursor from handle so we can place it on overlay
-                    cursor = styler.css(handleEl, "curosr");
+                    cursor = styler.css(handleEl, "cursor");
 
                     overlayDiv = noder.createElement("div");
                     styler.css(overlayDiv, {

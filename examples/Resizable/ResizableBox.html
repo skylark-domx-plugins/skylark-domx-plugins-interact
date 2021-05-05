@@ -109,12 +109,16 @@
     var $ = skylarkjs.domx.query;
 
     $(".box").resizable({
-        handle: ".win-size-grip",
+        handle: {
+            grabber : {
+                selector :  ".win-size-grip"
+            }
+        },
         started: function (e, $el, opt) {
-            $el.css("cursor", "nwse-resize");
+            //$el.css("cursor", "nwse-resize");
         },
         stopped: function (e, $el, opt) {
-            $el.css("cursor", "");
+            //$el.css("cursor", "");
         }
     });        
 </script>
