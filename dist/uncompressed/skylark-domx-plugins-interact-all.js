@@ -15271,14 +15271,21 @@ define('skylark-domx-geom/geom',[
                 left: offset.left - parentOffset.left - pbex.left - mex.left
             }
         } else {
+            var // Get *real* offsetParent
+                parent = offsetParent(elm);
+
             var props = {
-                top: coords.top,
-                left: coords.left
+                top: coords.top + (scrollTop(parent) || 0),
+                left: coords.left + (scrollLeft(parent) || 0)
             }
+
+
 
             if (styler.css(elm, "position") == "static") {
                 props['position'] = "relative";
             }
+
+
             styler.css(elm, props);
             return this;
         }
@@ -15363,6 +15370,8 @@ define('skylark-domx-geom/geom',[
     function scrollLeft(elm, value) {
         if (elm.nodeType === 9) {
             elm = elm.defaultView;
+        } else if (elm == document.body) {
+            elm = document.scrollingElement  || document.documentElement;
         }
         var hasScrollLeft = "scrollLeft" in elm;
         if (value === undefined) {
@@ -15384,7 +15393,10 @@ define('skylark-domx-geom/geom',[
     function scrollTop(elm, value) {
         if (elm.nodeType === 9) {
             elm = elm.defaultView;
+        } else if (elm == document.body) {
+            elm = document.scrollingElement  || document.documentElement;
         }
+
         var hasScrollTop = "scrollTop" in elm;
 
         if (value === undefined) {
@@ -18202,7 +18214,7 @@ define('skylark-domx-fx/main',[
 });
 define('skylark-domx-fx', ['skylark-domx-fx/main'], function (main) { return main; });
 
-define('skylark-domx-plugins/plugins',[
+define('skylark-domx-plugins-base/plugins',[
     "skylark-langx-ns",
     "skylark-langx-types",
     "skylark-langx-objects",
@@ -18571,12 +18583,12 @@ define('skylark-domx-plugins/plugins',[
 
     return  skylark.attach("domx.plugins",plugins);
 });
-define('skylark-domx-plugins/main',[
+define('skylark-domx-plugins-base/main',[
 	"./plugins"
 ],function(plugins){
 	return plugins;
 });
-define('skylark-domx-plugins', ['skylark-domx-plugins/main'], function (main) { return main; });
+define('skylark-domx-plugins-base', ['skylark-domx-plugins-base/main'], function (main) { return main; });
 
 define('skylark-domx-plugins-interact/movable',[
     "skylark-langx/langx",
@@ -18585,7 +18597,7 @@ define('skylark-domx-plugins-interact/movable',[
     "skylark-domx-geom",
     "skylark-domx-eventer",
     "skylark-domx-styler",
-    "skylark-domx-plugins",
+    "skylark-domx-plugins-base",
     "./interact"
 ],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
     var on = eventer.on,
@@ -18786,7 +18798,7 @@ define('skylark-domx-plugins-interact/Movable',[
     "skylark-domx-geom",
     "skylark-domx-eventer",
     "skylark-domx-styler",
-    "skylark-domx-plugins",
+    "skylark-domx-plugins-base",
     "./interact"
 ],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
     var on = eventer.on,
@@ -18989,7 +19001,7 @@ define('skylark-domx-plugins-interact/resizable',[
     "skylark-domx-eventer",
     "skylark-domx-styler",
     "skylark-domx-query",
-    "skylark-domx-plugins",
+    "skylark-domx-plugins-base",
     "./interact",
     "./Movable"
 ],function(langx,noder,datax,finder,geom,eventer,styler,$,plugins,interact,Movable){

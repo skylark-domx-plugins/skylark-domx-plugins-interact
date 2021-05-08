@@ -5,7 +5,7 @@ define([
     "skylark-domx-geom",
     "skylark-domx-eventer",
     "skylark-domx-styler",
-    "skylark-domx-plugins",
+    "skylark-domx-plugins-base",
     "./interact"
 ],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
     var on = eventer.on,

@@ -105,7 +105,7 @@ define('skylark-domx-plugins-interact/movable',[
     "skylark-domx-geom",
     "skylark-domx-eventer",
     "skylark-domx-styler",
-    "skylark-domx-plugins",
+    "skylark-domx-plugins-base",
     "./interact"
 ],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
     var on = eventer.on,
@@ -306,7 +306,7 @@ define('skylark-domx-plugins-interact/Movable',[
     "skylark-domx-geom",
     "skylark-domx-eventer",
     "skylark-domx-styler",
-    "skylark-domx-plugins",
+    "skylark-domx-plugins-base",
     "./interact"
 ],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
     var on = eventer.on,
@@ -509,7 +509,7 @@ define('skylark-domx-plugins-interact/resizable',[
     "skylark-domx-eventer",
     "skylark-domx-styler",
     "skylark-domx-query",
-    "skylark-domx-plugins",
+    "skylark-domx-plugins-base",
     "./interact",
     "./Movable"
 ],function(langx,noder,datax,finder,geom,eventer,styler,$,plugins,interact,Movable){

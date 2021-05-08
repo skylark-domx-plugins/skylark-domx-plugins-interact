@@ -7,7 +7,7 @@ define([
     "skylark-domx-eventer",
     "skylark-domx-styler",
     "skylark-domx-query",
-    "skylark-domx-plugins",
+    "skylark-domx-plugins-base",
     "./interact",
     "./Movable"
 ],function(langx,noder,datax,finder,geom,eventer,styler,$,plugins,interact,Movable){
