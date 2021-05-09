@@ -9,7 +9,7 @@ define([
     "skylark-domx-query",
     "skylark-domx-plugins-base",
     "./interact",
-    "./Movable"
+    "./movable"
 ],function(langx,noder,datax,finder,geom,eventer,styler,$,plugins,interact,Movable){
     var on = eventer.on,
         off = eventer.off,
@@ -152,6 +152,8 @@ define([
                         if (movingCallback) {
                             movingCallback(e);
                         }
+                        eventer.resized(elm);
+
                     },
                     stopped: function(e) {
                         if (stoppedCallback) {
