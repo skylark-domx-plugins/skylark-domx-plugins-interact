@@ -25,7 +25,7 @@ define([
     var Resizable = plugins.Plugin.inherit({
         klassName: "Resizable",
 
-        "pluginName" : "lark.resizable",
+        "pluginName" : "lark.interact.resizable",
         
         options : {
             // prevents browser level actions like forward back gestures
