@@ -168,8 +168,8 @@ requirejs.config({
             main: 'main'
          },
          {
-           name : "skylark-domx-plugins",
-           location : "../node_modules/skylark-domx-plugins/dist/uncompressed/skylark-domx-plugins",
+           name : "skylark-domx-plugins-base",
+           location : "../node_modules/skylark-domx-plugins-base/dist/uncompressed/skylark-domx-plugins-base",
             main: 'main'
          },
          {
@@ -222,8 +222,8 @@ requirejs.config({
             main: 'main'
           },
           {
-            name: 'skylark-domx-scrolls',
-            location : "../node_modules/skylark-domx-scrolls/dist/uncompressed/skylark-domx-scrolls",
+            name: 'skylark-domx-plugins-scrolls',
+            location : "../node_modules/skylark-domx-plugins-scrolls/dist/uncompressed/skylark-domx-plugins-scrolls",
             main: 'main'
           },
 /*
@@ -260,12 +260,7 @@ requirejs.config({
 //           location : "../../skylark-widgets-base/src",
            main: 'main'
          },          
-          {
-            name: 'skylark-widgets-swt',
-            location : "../node_modules/skylark-widgets-swt/dist/uncompressed/skylark-widgets-swt",
-//            location : "../../skylark-widgets-swt/src",
-            main: 'main'
-          },
+
           {
             name: 'skylark-fabric',
             location : "../node_modules/skylark-fabric/dist/uncompressed/skylark-fabric",

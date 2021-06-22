@@ -5,5 +5,5 @@
  * @link www.skylarkjs.org
  * @license MIT
  */
-define(["./interact","./movable","./resizable","./selectable"],function(e){return e});
+define(["./interact","./movable","./resizable","./rotatable","./selectable"],function(e){return e});
 //# sourceMappingURL=sourcemaps/main.js.map

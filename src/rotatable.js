@@ -18,69 +18,63 @@ define([
         some = Array.prototype.some,
         map = Array.prototype.map;
 
-    var Movable = plugins.Plugin.inherit({
-        klassName: "Movable",
 
-        pluginName : "lark.interact.movable",
+
+    function applyTranform(obj,tX,tY) {
+        // Constrain the angle of camera (between 0 and 180)
+        if (tY > 180) tY = 180;
+        if (tY < 0) tY = 0;
+
+        // Apply the angle
+        obj.style.transform = "rotateX(" + -tY + "deg) rotateY(" + tX + "deg)";
+    }
+
+
+    var Rotatable = plugins.Plugin.inherit({
+        klassName: "Rotatable",
+
+        pluginName : "lark.interact.rotatable",
 
 
         _construct : function (elm, options) {
             this.overrided(elm,options);
 
 
-
-            function updateWithTouchData(e) {
-                var keys, i;
-
-                if (e.changedTouches) {
-                    keys = "screenX screenY pageX pageY clientX clientY".split(' ');
-                    for (i = 0; i < keys.length; i++) {
-                        e[keys[i]] = e.changedTouches[0][keys[i]];
-                    }
-                }
-            }
-
-            function updateWithMoveData(e) {
-                e.movable = self;
-                e.moveEl = elm;
-                e.handleEl = handleEl;
-            }
-
             options = this.options;
             var self = this,
                 handleEl = options.handle || elm,
-                auto = options.auto === false ? false : true,
-                constraints = options.constraints,
                 overlayDiv,
                 doc = options.document || document,
                 downButton,
                 start,
                 stop,
-                startX,
-                startY,
-                originalPos,
-                drag,
-                size,
+                prevX,
+                prevY,
                 startingCallback = options.starting,
                 startedCallback = options.started,
                 movingCallback = options.moving,
                 stoppedCallback = options.stopped,
 
+                tX = 0,
+                tY = 10,
+                deltaX = 0,
+                deltaY = 0,
+
+                timer,
+
                 start = function(e) {
+                    if (e.pointerType=="mouse" &&  e.button !== 0) {
+                        return stop(e);
+                    }
+                    
                     var docSize = geom.getDocumentSize(doc),
                         cursor;
-
-                    updateWithTouchData(e);
-                    updateWithMoveData(e);
 
                     if (startingCallback) {
                         var ret = startingCallback(e)
                         if ( ret === false) {
                             return;
                         } else if (langx.isPlainObject(ret)) {
-                            if (ret.constraints) {
-                                constraints = ret.constraints;
-                            }
                             if (ret.started) {
                                 startedCallback = ret.started;
                             }
@@ -96,12 +90,10 @@ define([
                     e.preventDefault();
 
                     downButton = e.button;
-                    //handleEl = getHandleEl();
-                    startX = e.screenX;
-                    startY = e.screenY;
 
-                    originalPos = geom.relativePosition(elm);
-                    size = geom.size(elm);
+                    //handleEl = getHandleEl();
+                    prevX = e.clientX;
+                    prevY = e.clientY;
 
                     // Grab cursor from handle so we can place it on overlay
                     cursor = styler.css(handleEl, "cursor");
@@ -119,7 +111,9 @@ define([
                     });
                     noder.append(doc.body, overlayDiv);
 
-                    eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
+                    clearInterval(timer);
+
+                    eventer.on(doc, "pointermove", move).on(doc, "pointerup", stop);
 
                     if (startedCallback) {
                         startedCallback(e);
@@ -127,54 +121,44 @@ define([
                 },
 
                 move = function(e) {
-                    updateWithTouchData(e);
-                    updateWithMoveData(e);
 
-                    if (e.button !== 0) {
-                        return stop(e);
-                    }
 
-                    e.deltaX = e.screenX - startX;
-                    e.deltaY = e.screenY - startY;
+                    deltaX = e.deltaX = e.clientX - prevX;
+                    deltaY = e.deltaY = e.clientY - prevY;
 
-                    if (auto) {
-                        var l = originalPos.left + e.deltaX,
-                            t = originalPos.top + e.deltaY;
-                        if (constraints) {
+                    prevX = e.clientX;
+                    prevY = e.clientY;
 
-                            if (l < constraints.minX) {
-                                l = constraints.minX;
-                            }
 
-                            if (l > constraints.maxX) {
-                                l = constraints.maxX;
-                            }
-
-                            if (t < constraints.minY) {
-                                t = constraints.minY;
-                            }
-
-                            if (t > constraints.maxY) {
-                                t = constraints.maxY;
-                            }
-                        }
-                    }
-
-                    geom.relativePosition(elm, {
-                        left: l,
-                        top: t
-                    })
+                    tX += deltaX * 0.1;
+                    tY += deltaY * 0.1;
+                    applyTranform(elm,tX,tY);
 
                     e.preventDefault();
+
                     if (movingCallback) {
                         movingCallback(e);
                     }
                 },
 
-                stop = function(e) {
-                    updateWithTouchData(e);
+                stop = function(e) { 
+                    eventer.off(doc, "pointermove", move).off(doc, "pointerup", stop);
 
-                    eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
+                    let deta
+
+                    timer = setInterval(function() {
+                        deltaX *= 0.95;
+                        deltaY *= 0.95;
+                        tX += deltaX * 0.1;
+                        tY += deltaX * 0.1;
+                        applyTranform(elm,tX,tY);
+
+                        ///playSpin(false);
+                        if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) {
+                          clearInterval(timer);
+                          //playSpin(true);
+                        }
+                    }, 17);
 
                     noder.remove(overlayDiv);
 
@@ -183,7 +167,7 @@ define([
                     }
                 };
 
-            eventer.on(handleEl, "mousedown touchstart", start);
+            eventer.on(handleEl, "pointerdown", start);
 
             this._handleEl = handleEl;
 
@@ -194,7 +178,7 @@ define([
         }
     });
 
-    plugins.register(Movable,"movable");
+    plugins.register(Rotatable,"rotatable");
 
-    return interact.Movable = Movable;
+    return interact.Rotatable = Rotatable;
 });

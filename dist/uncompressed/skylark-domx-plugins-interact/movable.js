@@ -21,7 +21,7 @@ define([
     var Movable = plugins.Plugin.inherit({
         klassName: "Movable",
 
-        pluginName : "lark.movable",
+        pluginName : "lark.interact.movable",
 
 
         _construct : function (elm, options) {
@@ -56,10 +56,10 @@ define([
                 downButton,
                 start,
                 stop,
-                drag,
                 startX,
                 startY,
                 originalPos,
+                drag,
                 size,
                 startingCallback = options.starting,
                 startedCallback = options.started,
