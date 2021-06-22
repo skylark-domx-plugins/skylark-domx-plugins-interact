@@ -151,20 +151,20 @@
       <div id="spin-container" style="width: 120px; height: 170px; animation: 60s linear 0s infinite normal none running spinRevert;">
 
         <!-- Add your images (or video) here -->
-        <img src="../assets/images/pexels-photo-206395.jpeg" alt="" style="transform: rotateY(0deg) translateZ(240px); transition: transform 1s ease 2s;">
-        <img src="../assets/images/pexels-photo-1391498.jpeg" alt="" style="transform: rotateY(45deg) translateZ(240px); transition: transform 1s ease 1.75s;">
-        <img src="../assets/images/pexels-photo-1382731.jpeg" alt="" style="transform: rotateY(90deg) translateZ(240px); transition: transform 1s ease 1.5s;">
-        <img src="../assets/images/pexels-photo-1758144.jpeg" alt="" style="transform: rotateY(135deg) translateZ(240px); transition: transform 1s ease 1.25s;">
-        <img src="../assets/images/pexels-photo-1382734.jpeg" alt="" style="transform: rotateY(180deg) translateZ(240px); transition: transform 1s ease 1s;">
-        <img src="../assets/images/pexels-photo-1462636.jpeg" alt="" style="transform: rotateY(225deg) translateZ(240px); transition: transform 1s ease 0.75s;">
+        <img src="../assets/images/pexels-photo-206395.jpeg">
+        <img src="../assets/images/pexels-photo-1391498.jpeg">
+        <img src="../assets/images/pexels-photo-1382731.jpeg">
+        <img src="../assets/images/pexels-photo-1758144.jpeg">
+        <img src="../assets/images/pexels-photo-1382734.jpeg">
+        <img src="../assets/images/pexels-photo-1462636.jpeg">
 
         <!-- Example image with link -->
         <a target="_blank" href="https://images.pexels.com/photos/139829/pexels-photo-139829.jpeg">
-          <img src="../assets/images/pexels-photo-139829.jpeg" alt="" style="transform: rotateY(270deg) translateZ(240px); transition: transform 1s ease 0.5s;">
+          <img src="../assets/images/pexels-photo-139829.jpeg">
         </a>
 
         <!-- Example add video  -->
-        <video controls="" autoplay="autoplay" loop="" style="transform: rotateY(315deg) translateZ(240px); transition: transform 1s ease 0.25s;">
+        <video controls="" autoplay="autoplay" loop="">
           <source src="https://player.vimeo.com/external/322244668.sd.mp4?s=338c48ac2dfcb1d4c0689968b5baf94eee6ca0c1&amp;profile_id=165&amp;oauth2_token_id=57447761" type="video/mp4">
         </video>
 
@@ -212,7 +212,6 @@
 */
 
       // ===================== start =======================
-      setTimeout(init, 100);
 
       var odrag = document.getElementById("drag-container");
       var ospin = document.getElementById("spin-container");
@@ -231,18 +230,19 @@
 
       function init(delayTime) {
         for (var i = 0; i < aEle.length; i++) {
-          aEle[i].style.transform =
-            "rotateY(" +
-            i * (360 / aEle.length) +
-            "deg) translateZ(" +
-            radius +
-            "px)";
+          ///aEle[i].style.transform =
+          ///  "rotateY(" +
+          ///  i * (360 / aEle.length) +
+          ///  "deg) translateZ(" +
+          ///  radius +
+          ///  "px)";
+          aEle[i].style.transform = "rotateY(" + i * (360 / aEle.length) + "deg)";
           aEle[i].style.transition = "transform 1s";
-          aEle[i].style.transitionDelay =
-            delayTime || (aEle.length - i) / 4 + "s";
+          aEle[i].style.transitionDelay = delayTime || (aEle.length - i) / 4 + "s";
         }
       }
 
+      init(1);
       // auto spin
       if (autoRotate) {
         var animationName = rotateSpeed > 0 ? "spin" : "spinRevert";
@@ -263,15 +263,6 @@
       }
 
 
-      document.onmousewheel = function(e) {
-        e = e || window.event;
-        var d = e.wheelDelta / 20 || -e.detail;
-        radius += d;
-        init(1);
-      };
-
-
-
     function playSpin(yes) {
         ospin.style.animationPlayState = yes ? "running" : "paused";
     }
@@ -284,8 +275,13 @@
       stopped : function() {
           playSpin(true);
       }
-    });      
+    }); 
 
+    interact.Scalable(odrag,{
+      radius : radius,
+
+      targets : aEle
+    }); 
   }
 
 
