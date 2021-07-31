@@ -5,5 +5,5 @@
  * @link www.skylarkjs.org
  * @license MIT
  */
-define(["skylark-langx/skylark"],function(n){return n.attach("domx.plugins.interact",{})});
+define(["skylark-domx-plugins-base/plugins"],function(n){"use strict";return n.interact={}});
 //# sourceMappingURL=sourcemaps/interact.js.map

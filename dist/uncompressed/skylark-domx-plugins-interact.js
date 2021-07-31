@@ -87,12 +87,12 @@
 })(function(define,require) {
 
 define('skylark-domx-plugins-interact/interact',[
-    "skylark-langx/skylark"
-], function(skylark) {
+    "skylark-domx-plugins-base/plugins"
+], function(plugins) {
+    'use strict';
 
-	return skylark.attach("domx.plugins.interact",{});
+	return plugins.interact = {};
 });
-
 
 define('skylark-domx-plugins-interact/movable',[
     "skylark-langx/langx",
