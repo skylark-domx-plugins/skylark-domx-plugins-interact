@@ -4,7 +4,12 @@
     <title>Simple Box Resizing - jquery-resizable</title>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="../../skins/default/resizable.css">
+
     <style>
+        * {
+            box-sizing : border-box;
+        }
         html, body {
             height: 100%;
             font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
@@ -63,6 +68,8 @@
             border-radius: 4px;
         }
     </style>
+    <script type="text/javascript" src="../require.js" data-main="../main.js"></script>
+
 </head>
 <body>
 
@@ -104,23 +111,22 @@
         <p></p>
     </div>
 
-    <script type="text/javascript" src="../../dist/uncompressed/skylark-domx-plugins-interact-all.js"></script>
 <script>    
-    var $ = skylarkjs.domx.query;
-
-    $(".box").resizable({
-        handle: {
-            grabber : {
-                selector :  ".win-size-grip"
+    function initPage(langx,$,interact) {
+        $(".box").resizable({
+            handle: {
+                grabber : {
+                    selector :  ".win-size-grip"
+                }
+            },
+            started: function (e, $el, opt) {
+                //$el.css("cursor", "nwse-resize");
+            },
+            stopped: function (e, $el, opt) {
+                //$el.css("cursor", "");
             }
-        },
-        started: function (e, $el, opt) {
-            //$el.css("cursor", "nwse-resize");
-        },
-        stopped: function (e, $el, opt) {
-            //$el.css("cursor", "");
-        }
-    });        
+        });    
+    }    
 </script>
 </body>
 </html>

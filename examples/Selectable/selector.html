@@ -1,12 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+     <link rel="stylesheet" href="../assets/css/jqueryui/all.css">
+   
     <style type="text/css">
     body {
-        padding: 1em;
-        color: #666;
-        background-color: #dedede;
+        margin : 0px;
     }
 
     #moveable1 {
@@ -132,11 +133,11 @@
 
 
     </style>
-    <script type="text/javascript" src="../../dist/uncompressed/skylark-utils-all.js"></script>
+    <script type="text/javascript" src="../require.js" data-main="../main.js"></script>
 </head>
 
-<body>
-    <h1>Skylark Moveable test</h1>
+<body >
+    Skylark Moveable test
     <table id="moveable1">
         <tr>
             <td id="handle1" colspan="2">You can drag the table using this handle.</td>
@@ -167,14 +168,14 @@
         <div id="moveable3">You can move this paragraph. It is relatively positioned.</div>
     </div>
     <script>
-        var $ = skylarkjs.dom.query;
-        skylarkjs.interact.selectable.init({
-            classPrefix : "gjs-"
-        });
+        function initPage(langx,$,interact) {
+            interact.Selectable.init({
+                classPrefix : "gjs-"
+            });
 
-        skylarkjs.interact.selectable.select(skylarkjs.finder.byId("moveable1"));
+            interact.Selectable.select($("#moveable1")[0]);
 
-
+        }
     </script>
 </body>
 

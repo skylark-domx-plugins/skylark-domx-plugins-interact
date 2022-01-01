@@ -105,7 +105,7 @@ define([
         classPrefix = options.classPrefix || "";
 
         var appendTo = options.appendTo || document.body;
-        container = noder.createElement('div',{
+        container = noder.createElement('div',{},{
             "class" : classPrefix + 'resizer-c'
         });
         noder.append(appendTo,container);
@@ -114,7 +114,7 @@ define([
         // Create handlers
         handlers = {};
         ['tl', 'tc', 'tr', 'cl', 'cr', 'bl', 'bc', 'br'].forEach(function(n) {
-            return handlers[n] = noder.createElement("i",{
+            return handlers[n] = noder.createElement("i",{},{
                     "class" : classPrefix + 'resizer-h ' + classPrefix + 'resizer-h-' + n,
                     "data-resize-handler" : n
                 });

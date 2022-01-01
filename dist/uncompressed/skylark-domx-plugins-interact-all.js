@@ -101,19 +101,26 @@ define('skylark-langx-ns/_attach',[],function(){
             name = path[i++];
         }
 
-        ns[name] = obj2 || {};
+        if (ns[name]) {
+            if (obj2) {
+                throw new Error("This namespace already exists:" + path);
+            }
+
+        } else {
+            ns[name] = obj2 || {};
+        }
         return ns[name];
     }
 });
 define('skylark-langx-ns/ns',[
     "./_attach"
 ], function(_attach) {
-    var skylark = {
+    var root = {
     	attach : function(path,obj) {
-    		return _attach(skylark,path,obj);
+    		return _attach(root,path,obj);
     	}
     };
-    return skylark;
+    return root;
 });
 
 define('skylark-langx-ns/main',[
@@ -590,6 +597,133 @@ define('skylark-langx-objects/objects',[
         return keys;
     }
 
+    // Retrieve the names of an object's own properties.
+    // Delegates to **ECMAScript 5**'s native `Object.keys`.
+    function keys(obj) {
+        if (isObject(obj)) return [];
+        var keys = [];
+        for (var key in obj) if (has(obj, key)) keys.push(key);
+        return keys;
+    }
+
+    function has(obj, path) {
+        if (!isArray(path)) {
+            return obj != null && hasOwnProperty.call(obj, path);
+        }
+        var length = path.length;
+        for (var i = 0; i < length; i++) {
+            var key = path[i];
+            if (obj == null || !hasOwnProperty.call(obj, key)) {
+                return false;
+            }
+            obj = obj[key];
+        }
+        return !!length;
+    }
+
+
+    // Returns whether an object has a given set of `key:value` pairs.
+    function isMatch(object, attrs) {
+        var keys = keys(attrs), length = keys.length;
+        if (object == null) return !length;
+        var obj = Object(object);
+        for (var i = 0; i < length; i++) {
+          var key = keys[i];
+          if (attrs[key] !== obj[key] || !(key in obj)) return false;
+        }
+        return true;
+    }    
+
+
+    function removeItem(items, item) {
+        if (isArray(items)) {
+            var idx = items.indexOf(item);
+            if (idx != -1) {
+                items.splice(idx, 1);
+            }
+        } else if (isPlainObject(items)) {
+            for (var key in items) {
+                if (items[key] == item) {
+                    delete items[key];
+                    break;
+                }
+            }
+        }
+
+        return this;
+    }
+
+
+
+    // Retrieve the values of an object's properties.
+    function values(obj) {
+        var keys = allKeys(obj);
+        var length = keys.length;
+        var values = Array(length);
+        for (var i = 0; i < length; i++) {
+            values[i] = obj[keys[i]];
+        }
+        return values;
+    }
+
+
+    return skylark.attach("langx.objects",{
+        allKeys: allKeys,
+
+        attach : skylark.attach,
+
+        defaults : createAssigner(allKeys, true),
+
+        has: has,
+
+        isMatch: isMatch,
+
+        keys: keys,
+
+        removeItem: removeItem,
+
+        values: values
+    });
+
+
+});
+define('skylark-langx-objects/clone',[
+    "skylark-langx-types",
+    "./objects"
+],function(types,objects) {
+    var isPlainObject = types.isPlainObject,
+        isArray = types.isArray;
+
+    function clone( /*anything*/ src,checkCloneMethod) {
+        var copy;
+        if (src === undefined || src === null) {
+            copy = src;
+        } else if (checkCloneMethod && src.clone) {
+            copy = src.clone();
+        } else if (isArray(src)) {
+            copy = [];
+            for (var i = 0; i < src.length; i++) {
+                copy.push(clone(src[i]));
+            }
+        } else if (isPlainObject(src)) {
+            copy = {};
+            for (var key in src) {
+                copy[key] = clone(src[key]);
+            }
+        } else {
+            copy = src;
+        }
+
+        return copy;
+
+    }
+
+    return objects.clone = clone;
+});
+define('skylark-langx-objects/each',[
+    "./objects"
+],function(objects) {
+
     function each(obj, callback,isForEach) {
         var length, key, i, undef, value;
 
@@ -620,6 +754,94 @@ define('skylark-langx-objects/objects',[
         return this;
     }
 
+    return objects.each = each;
+});
+define('skylark-langx-objects/_mixin',[
+    "skylark-langx-types",
+    "./objects"
+],function(types,objects) {
+
+    var isPlainObject = types.isPlainObject;
+
+    function _mixin(target, source, deep, safe) {
+        for (var key in source) {
+            //if (!source.hasOwnProperty(key)) {
+            //    continue;
+            //}
+            if (safe && target[key] !== undefined) {
+                continue;
+            }
+            // if (deep && (isPlainObject(source[key]) || isArray(source[key]))) {
+            //    if (isPlainObject(source[key]) && !isPlainObject(target[key])) {
+            if (deep && isPlainObject(source[key])) {
+                if (!isPlainObject(target[key])) {
+                    target[key] = {};
+                }
+                //if (isArray(source[key]) && !isArray(target[key])) {
+                //    target[key] = [];
+                //}
+                _mixin(target[key], source[key], deep, safe);
+            } else if (source[key] !== undefined) {
+                target[key] = source[key]
+            }
+        }
+        return target;
+    }
+
+    return _mixin;
+});
+define('skylark-langx-objects/_parse_mixin_args',[
+    "skylark-langx-types",
+    "./objects"
+],function(types,objects) {
+
+    var slice = Array.prototype.slice,
+        isBoolean = types.isBoolean;
+
+    function _parseMixinArgs(args) {
+        var params = slice.call(arguments, 0),
+            target = params.shift(),
+            deep = false;
+        if (isBoolean(params[params.length - 1])) {
+            deep = params.pop();
+        }
+
+        return {
+            target: target,
+            sources: params,
+            deep: deep
+        };
+    }
+    
+    return _parseMixinArgs;
+});
+define('skylark-langx-objects/mixin',[
+	"skylark-langx-types",
+	"./objects",
+  "./_mixin",
+  "./_parse_mixin_args"
+],function(types,objects,_mixin,_parseMixinArgs) {
+
+
+    function mixin() {
+        var args = _parseMixinArgs.apply(this, arguments);
+
+        args.sources.forEach(function(source) {
+            _mixin(args.target, source, args.deep, false);
+        });
+        return args.target;
+    }
+
+
+    return objects.mixin = mixin;
+	
+});
+define('skylark-langx-objects/extend',[
+    "./objects",
+    "./mixin"
+],function(objects,mixin) {
+    var slice = Array.prototype.slice;
+
     function extend(target) {
         var deep, args = slice.call(arguments, 1);
         if (typeof target == 'boolean') {
@@ -636,29 +858,11 @@ define('skylark-langx-objects/objects',[
         return target;
     }
 
-    // Retrieve the names of an object's own properties.
-    // Delegates to **ECMAScript 5**'s native `Object.keys`.
-    function keys(obj) {
-        if (isObject(obj)) return [];
-        var keys = [];
-        for (var key in obj) if (has(obj, key)) keys.push(key);
-        return keys;
-    }
-
-    function has(obj, path) {
-        if (!isArray(path)) {
-            return obj != null && hasOwnProperty.call(obj, path);
-        }
-        var length = path.length;
-        for (var i = 0; i < length; i++) {
-            var key = path[i];
-            if (obj == null || !hasOwnProperty.call(obj, key)) {
-                return false;
-            }
-            obj = obj[key];
-        }
-        return !!length;
-    }
+    return objects.extend = extend;
+});
+define('skylark-langx-objects/includes',[
+    "./objects"
+],function(objects) {
 
     /**
      * Checks if `value` is in `collection`. If `collection` is a string, it's
@@ -704,208 +908,10 @@ define('skylark-langx-objects/objects',[
     }
 
 
-    // Returns whether an object has a given set of `key:value` pairs.
-    function isMatch(object, attrs) {
-        var keys = keys(attrs), length = keys.length;
-        if (object == null) return !length;
-        var obj = Object(object);
-        for (var i = 0; i < length; i++) {
-          var key = keys[i];
-          if (attrs[key] !== obj[key] || !(key in obj)) return false;
-        }
-        return true;
-    }    
 
-    function _mixin(target, source, deep, safe) {
-        for (var key in source) {
-            //if (!source.hasOwnProperty(key)) {
-            //    continue;
-            //}
-            if (safe && target[key] !== undefined) {
-                continue;
-            }
-            // if (deep && (isPlainObject(source[key]) || isArray(source[key]))) {
-            //    if (isPlainObject(source[key]) && !isPlainObject(target[key])) {
-            if (deep && isPlainObject(source[key])) {
-                if (!isPlainObject(target[key])) {
-                    target[key] = {};
-                }
-                //if (isArray(source[key]) && !isArray(target[key])) {
-                //    target[key] = [];
-                //}
-                _mixin(target[key], source[key], deep, safe);
-            } else if (source[key] !== undefined) {
-                target[key] = source[key]
-            }
-        }
-        return target;
-    }
-
-    function _parseMixinArgs(args) {
-        var params = slice.call(arguments, 0),
-            target = params.shift(),
-            deep = false;
-        if (isBoolean(params[params.length - 1])) {
-            deep = params.pop();
-        }
-
-        return {
-            target: target,
-            sources: params,
-            deep: deep
-        };
-    }
-
-    function mixin() {
-        var args = _parseMixinArgs.apply(this, arguments);
-
-        args.sources.forEach(function(source) {
-            _mixin(args.target, source, args.deep, false);
-        });
-        return args.target;
-    }
-
-   // Return a copy of the object without the blacklisted properties.
-    function omit(obj, prop1,prop2) {
-        if (!obj) {
-            return null;
-        }
-        var result = mixin({},obj);
-        for(var i=1;i<arguments.length;i++) {
-            var pn = arguments[i];
-            if (pn in obj) {
-                delete result[pn];
-            }
-        }
-        return result;
-
-    }
-
-   // Return a copy of the object only containing the whitelisted properties.
-    function pick(obj,prop1,prop2) {
-        if (!obj) {
-            return null;
-        }
-        var result = {};
-        for(var i=1;i<arguments.length;i++) {
-            var pn = arguments[i];
-            if (pn in obj) {
-                result[pn] = obj[pn];
-            }
-        }
-        return result;
-    }
-
-    function removeItem(items, item) {
-        if (isArray(items)) {
-            var idx = items.indexOf(item);
-            if (idx != -1) {
-                items.splice(idx, 1);
-            }
-        } else if (isPlainObject(items)) {
-            for (var key in items) {
-                if (items[key] == item) {
-                    delete items[key];
-                    break;
-                }
-            }
-        }
-
-        return this;
-    }
-
-
-    function safeMixin() {
-        var args = _parseMixinArgs.apply(this, arguments);
-
-        args.sources.forEach(function(source) {
-            _mixin(args.target, source, args.deep, true);
-        });
-        return args.target;
-    }
-
-    // Retrieve the values of an object's properties.
-    function values(obj) {
-        var keys = allKeys(obj);
-        var length = keys.length;
-        var values = Array(length);
-        for (var i = 0; i < length; i++) {
-            values[i] = obj[keys[i]];
-        }
-        return values;
-    }
-
-    function clone( /*anything*/ src,checkCloneMethod) {
-        var copy;
-        if (src === undefined || src === null) {
-            copy = src;
-        } else if (checkCloneMethod && src.clone) {
-            copy = src.clone();
-        } else if (isArray(src)) {
-            copy = [];
-            for (var i = 0; i < src.length; i++) {
-                copy.push(clone(src[i]));
-            }
-        } else if (isPlainObject(src)) {
-            copy = {};
-            for (var key in src) {
-                copy[key] = clone(src[key]);
-            }
-        } else {
-            copy = src;
-        }
-
-        return copy;
-
-    }
-
-    function scall(obj,method,arg1,arg2) {
-        if (obj && obj[method]) {
-            var args = slice.call(arguments, 2);
-
-            return obj[method].apply(obj,args);
-        }
-    }
-
-    return skylark.attach("langx.objects",{
-        allKeys: allKeys,
-
-        attach : skylark.attach,
-
-        clone: clone,
-
-        defaults : createAssigner(allKeys, true),
-
-        each : each,
-
-        extend : extend,
-
-        has: has,
-
-        includes: includes,
-
-        isMatch: isMatch,
-
-        keys: keys,
-
-        mixin: mixin,
-
-        omit: omit,
-
-        pick: pick,
-
-        removeItem: removeItem,
-     
-        safeMixin: safeMixin,
-
-        scall,
-
-        values: values
-    });
-
-
+    return objects.includes = includes;
 });
-define('skylark-langx-objects/isEqual',[
+define('skylark-langx-objects/is-equal',[
 	"skylark-langx-types",
 	"./objects"
 ],function(types,objects) {
@@ -1028,6 +1034,49 @@ define('skylark-langx-objects/isEqual',[
     return objects.isEqual = isEqual;
 	
 });
+define('skylark-langx-objects/omit',[
+    "./objects"
+],function(objects) {
+
+   // Return a copy of the object without the blacklisted properties.
+    function omit(obj, prop1,prop2) {
+        if (!obj) {
+            return null;
+        }
+        var result = mixin({},obj);
+        for(var i=1;i<arguments.length;i++) {
+            var pn = arguments[i];
+            if (pn in obj) {
+                delete result[pn];
+            }
+        }
+        return result;
+
+    }
+    
+    return objects.omit = omit;
+});
+define('skylark-langx-objects/pick',[
+    "./objects"
+],function(objects) {
+
+   // Return a copy of the object only containing the whitelisted properties.
+    function pick(obj,prop1,prop2) {
+        if (!obj) {
+            return null;
+        }
+        var result = {};
+        for(var i=1;i<arguments.length;i++) {
+            var pn = arguments[i];
+            if (pn in obj) {
+                result[pn] = obj[pn];
+            }
+        }
+        return result;
+    }
+    
+    return objects.pick = pick;
+});
 define('skylark-langx-objects/result',[
 	"skylark-langx-types",
 	"./objects"
@@ -1058,10 +1107,67 @@ define('skylark-langx-objects/result',[
     return objects.result = result;
 	
 });
+define('skylark-langx-objects/safe-mixin',[
+	"./objects",
+  "./_mixin",
+  "./_parse_mixin_args"
+],function(objects,_mixin,_parseMixinArgs) {
+
+    function safeMixin() {
+        var args = _parseMixinArgs.apply(this, arguments);
+
+        args.sources.forEach(function(source) {
+            _mixin(args.target, source, args.deep, true);
+        });
+        return args.target;
+    }
+
+    return objects.safeMixin = safeMixin;
+});
+define('skylark-langx-objects/scall',[
+    "./objects"
+],function(objects) {
+
+    function scall(obj,method,arg1,arg2) {
+        if (obj && obj[method]) {
+            var args = slice.call(arguments, 2);
+
+            return obj[method].apply(obj,args);
+        }
+    }
+
+    return objects.scall = scall;
+});
+ define('skylark-langx-objects/shadow',[
+	"./objects"
+],function(objects) {
+
+    function shadow(obj, prop, value) {
+        Object.defineProperty(obj, prop, {
+            value,
+            enumerable: true,
+            configurable: true,
+            writable: false
+        });
+        return value;
+    }
+
+    return objects.shadow = shadow;
+});
 define('skylark-langx-objects/main',[
 	"./objects",
-	"./isEqual",
-	"./result"
+	"./clone",
+	"./each",
+	"./extend",
+	"./includes",
+	"./is-equal",
+	"./mixin",
+	"./omit",
+	"./pick",
+	"./result",
+	"./safe-mixin",
+	"./scall",
+	"./shadow"
 ],function(objects){
 	return objects;
 });
@@ -2398,8 +2504,8 @@ define('skylark-langx-funcs/template',[
   "./funcs",
   "./proxy"
 ],function(objects,funcs,proxy){
+    //ref : underscore
     var slice = Array.prototype.slice;
-
    
     // By default, Underscore uses ERB-style template delimiters, change the
     // following template settings to use alternative delimiters.
@@ -2510,6 +2616,25 @@ define('skylark-langx-funcs/throttle',[
         };
         return throttled;
     };
+
+    /*
+    function throttle(func, delay) {
+        var timer = null;
+
+        return function() {
+            var context = this,
+                args = arguments;
+
+            if ( timer === null ) {
+                timer = setTimeout(function() {
+                    func.apply(context, args);
+                    timer = null;
+                }, delay);
+            }
+        };
+    }
+    */
+
 
     return funcs.throttle = throttle;
 });
@@ -3336,7 +3461,7 @@ define('skylark-langx-hoster/main',[
 });
 define('skylark-langx-hoster', ['skylark-langx-hoster/main'], function (main) { return main; });
 
-define('skylark-langx-events/Event',[
+define('skylark-langx-events/event',[
   "skylark-langx-objects",
   "skylark-langx-funcs",
   "skylark-langx-klass",
@@ -3393,13 +3518,13 @@ define('skylark-langx-events/Event',[
     return events.Event = Event;
     
 });
-define('skylark-langx-events/Listener',[
+define('skylark-langx-events/listener',[
   "skylark-langx-types",
   "skylark-langx-objects",
   "skylark-langx-arrays",
   "skylark-langx-klass",
   "./events",
-  "./Event"
+  "./event"
 ],function(types,objects,arrays,klass,events,Event){
     var slice = Array.prototype.slice,
         compact = arrays.compact,
@@ -3421,6 +3546,31 @@ define('skylark-langx-events/Listener',[
                 return this;
             }
 
+            if (types.isPlainObject(event)){
+                //listenTo(obj,callbacks,one)
+                if (types.isBoolean(selector)) {
+                    one = selector;
+                    selector = null;
+                } else if (types.isBoolean(callback)) {
+                    one = callback;
+                }
+                var callbacks = event;
+                for (var name in callbacks) {
+
+                    var match = name.match( /^([\w:-]*)\s*(.*)$/ );
+                    var name1 = match[ 1 ];
+                    var selector1 = match[ 2 ] || selector;
+
+                    if (selector1) {
+                        this.listenTo(obj,name1,selector1,callbacks[name],one);
+                    } else {
+                        this.listenTo(obj,name1,callbacks[name],one);
+                    }
+
+                }
+                return this;
+            }
+
             if (isBoolean(callback)) {
                 one = callback;
                 callback = selector;
@@ -3434,14 +3584,7 @@ define('skylark-langx-events/Listener',[
                 selector = null;
             }
 
-            if (types.isPlainObject(event)){
-                //listenTo(obj,callbacks,one)
-                var callbacks = event;
-                for (var name in callbacks) {
-                    this.listenTo(obj,name,callbacks[name],one);
-                }
-                return this;
-            }
+
 
             if (!callback) {
                 callback = "handleEvent";
@@ -3452,17 +3595,19 @@ define('skylark-langx-events/Listener',[
                 callback = this[callback];
             }
 
+            var emitter = this.ensureListenedEmitter(obj)
+
             if (one) {
                 if (selector) {
-                    obj.one(event, selector,callback, this);
+                    emitter.one(event, selector,callback, this);
                 } else {
-                    obj.one(event, callback, this);
+                    emitter.one(event, callback, this);
                 }
             } else {
                  if (selector) {
-                    obj.on(event, selector, callback, this);
+                    emitter.on(event, selector, callback, this);
                 } else {
-                    obj.on(event, callback, this);
+                    emitter.on(event, callback, this);
                 }
             }
 
@@ -3529,7 +3674,8 @@ define('skylark-langx-events/Listener',[
 
                     for (var j = 0; j < listeningEvent.length; j++) {
                         if (!callback || callback == listeningEvent[i]) {
-                            listening.obj.off(eventName, listeningEvent[i], this);
+                            let emitter = this.ensureListenedEmitter(listening.obj);
+                            emitter.off(eventName, listeningEvent[i], this);
                             listeningEvent[i] = null;
                         }
                     }
@@ -3553,20 +3699,24 @@ define('skylark-langx-events/Listener',[
             }
 
             return this;
+        },
+
+        ensureListenedEmitter : function(obj) {
+            return obj;
         }
     });
 
     return events.Listener = Listener;
 
 });
-define('skylark-langx-events/Emitter',[
+define('skylark-langx-events/emitter',[
   "skylark-langx-types",
   "skylark-langx-objects",
   "skylark-langx-arrays",
   "skylark-langx-klass",
   "./events",
-  "./Event",
-  "./Listener"
+  "./event",
+  "./listener"
 ],function(types,objects,arrays,klass,events,Event,Listener){
     var slice = Array.prototype.slice,
         compact = arrays.compact,
@@ -3585,6 +3735,10 @@ define('skylark-langx-events/Emitter',[
             ns: segs.slice(1).join(" ")
         };
     }
+
+    
+    var queues  = new Map();
+
 
     var Emitter = Listener.inherit({
         _prepareArgs : function(e,args) {
@@ -3717,6 +3871,26 @@ define('skylark-langx-events/Emitter',[
             return this;
         },
 
+        queueEmit : function (event) {
+            const type = event.type || event;
+            let map = queues.get(this);
+            if (!map) {
+                map = new Map();
+                queues.set(this, map);
+            }
+            const oldTimeout = map.get(type);
+            map.delete(type);
+            window.clearTimeout(oldTimeout);
+            const timeout = window.setTimeout(() => {
+                if (map.size === 0) {
+                    map = null;
+                    queues.delete(this);
+                }
+                this.trigger(event);
+            }, 0);
+            map.set(type, timeout);
+        },
+
         listened: function(event) {
             var evtArr = ((this._hub || (this._events = {}))[event] || []);
             return evtArr.length > 0;
@@ -3768,18 +3942,24 @@ define('skylark-langx-events/Emitter',[
 
             return this;
         },
+
         trigger  : function() {
             return this.emit.apply(this,arguments);
+        },
+
+        queueTrigger : function (event) {
+            return this.queueEmit.apply(this,arguments);
         }
+
     });
 
 
     return events.Emitter = Emitter;
 
 });
-define('skylark-langx-events/createEvent',[
+define('skylark-langx-events/create-event',[
 	"./events",
-	"./Event"
+	"./event"
 ],function(events,Event){
     function createEvent(type,props) {
         //var e = new CustomEvent(type,props);
@@ -3791,10 +3971,10 @@ define('skylark-langx-events/createEvent',[
 });
 define('skylark-langx-events/main',[
 	"./events",
-	"./Event",
-	"./Listener",
-	"./Emitter",
-	"./createEvent"
+	"./event",
+	"./listener",
+	"./emitter",
+	"./create-event"
 ],function(events){
 	return events;
 });
@@ -10661,155 +10841,6 @@ define('skylark-langx/langx',[
 
     return skylark.langx = langx;
 });
-define('skylark-langx-scripter/scripter',[
-    "skylark-langx/skylark",
-    "skylark-langx/langx"
-], function(skylark, langx, noder) {
-
-    var head = document.getElementsByTagName('head')[0],
-        scriptsByUrl = {},
-        scriptElementsById = {},
-        count = 0;
-
-    var rscriptType = ( /^$|^module$|\/(?:java|ecma)script/i );
-
-    function scripter() {
-        return scripter;
-    }
-
-
-    var preservedScriptAttributes = {
-        type: true,
-        src: true,
-        nonce: true,
-        noModule: true
-    };
-
-    function evaluate(code,node, doc ) {
-        doc = doc || document;
-
-        var i, val,
-            script = doc.createElement("script");
-
-        script.text = code;
-        if ( node ) {
-            for ( i in preservedScriptAttributes ) {
-
-                // Support: Firefox 64+, Edge 18+
-                // Some browsers don't support the "nonce" property on scripts.
-                // On the other hand, just using `getAttribute` is not enough as
-                // the `nonce` attribute is reset to an empty string whenever it
-                // becomes browsing-context connected.
-                // See https://github.com/whatwg/html/issues/2369
-                // See https://html.spec.whatwg.org/#nonce-attributes
-                // The `node.getAttribute` check was added for the sake of
-                // `jQuery.globalEval` so that it can fake a nonce-containing node
-                // via an object.
-                val = node[ i ] || node.getAttribute && node.getAttribute( i );
-                if ( val ) {
-                    script.setAttribute( i, val );
-                }
-            }
-        }
-        doc.head.appendChild( script ).parentNode.removeChild( script );
-
-        return this;
-    }
-
-    langx.mixin(scripter, {
-        /*
-         * Load a script from a url into the document.
-         * @param {} url
-         * @param {} loadedCallback
-         * @param {} errorCallback
-         */
-        loadJavaScript: function(url, loadedCallback, errorCallback) {
-            var script = scriptsByUrl[url];
-            if (!script) {
-                script = scriptsByUrl[url] = {
-                    state: 0, //0:unload,1:loaded,-1:loaderror
-                    loadedCallbacks: [],
-                    errorCallbacks: []
-                }
-            }
-
-            script.loadedCallbacks.push(loadedCallback);
-            script.errorCallbacks.push(errorCallback);
-
-            if (script.state === 1) {
-                script.node.onload();
-            } else if (script.state === -1) {
-                script.node.onerror();
-            } else {
-                var node = script.node = document.createElement("script"),
-                    id = script.id = (count++);
-
-                node.type = "text/javascript";
-                node.async = false;
-                node.defer = false;
-                startTime = new Date().getTime();
-                head.appendChild(node);
-
-                node.onload = function() {
-                        script.state = 1;
-
-                        var callbacks = script.loadedCallbacks,
-                            i = callbacks.length;
-
-                        while (i--) {
-                            callbacks[i]();
-                        }
-                        script.loadedCallbacks = [];
-                        script.errorCallbacks = [];
-                    },
-                    node.onerror = function() {
-                        script.state = -1;
-                        var callbacks = script.errorCallbacks,
-                            i = callbacks.length;
-
-                        while (i--) {
-                            callbacks[i]();
-                        }
-                        script.loadedCallbacks = [];
-                        script.errorCallbacks = [];
-                    };
-                node.src = url;
-
-                scriptElementsById[id] = node;
-            }
-            return script.id;
-        },
-        /*
-         * Remove the specified script from the document.
-         * @param {Number} id
-         */
-        deleteJavaScript: function(id) {
-            var node = scriptElementsById[id];
-            if (node) {
-                var url = node.src;
-                if (node.parentNode) {
-                    node.parentNode.remove(node);
-                }
-                delete scriptElementsById[id];
-                delete scriptsByUrl[url];
-            }
-        },
-
-        evaluate : evaluate,
-
-
-    });
-
-    return skylark.attach("langx.scripter", scripter);
-});
-define('skylark-langx-scripter/main',[
-	"./scripter"
-],function(scripter){
-	
-	return scripter;
-});
-define('skylark-langx-scripter', ['skylark-langx-scripter/main'], function (main) { return main; });
-
 define('skylark-domx-browser/browser',[
     "skylark-langx/skylark",
     "skylark-langx/langx"
@@ -11041,6 +11072,155 @@ define('skylark-domx-browser/main',[
 	return browser;
 });
 define('skylark-domx-browser', ['skylark-domx-browser/main'], function (main) { return main; });
+
+define('skylark-langx-scripter/scripter',[
+    "skylark-langx/skylark",
+    "skylark-langx/langx"
+], function(skylark, langx, noder) {
+
+    var head = document.getElementsByTagName('head')[0],
+        scriptsByUrl = {},
+        scriptElementsById = {},
+        count = 0;
+
+    var rscriptType = ( /^$|^module$|\/(?:java|ecma)script/i );
+
+    function scripter() {
+        return scripter;
+    }
+
+
+    var preservedScriptAttributes = {
+        type: true,
+        src: true,
+        nonce: true,
+        noModule: true
+    };
+
+    function evaluate(code,node, doc ) {
+        doc = doc || document;
+
+        var i, val,
+            script = doc.createElement("script");
+
+        script.text = code;
+        if ( node ) {
+            for ( i in preservedScriptAttributes ) {
+
+                // Support: Firefox 64+, Edge 18+
+                // Some browsers don't support the "nonce" property on scripts.
+                // On the other hand, just using `getAttribute` is not enough as
+                // the `nonce` attribute is reset to an empty string whenever it
+                // becomes browsing-context connected.
+                // See https://github.com/whatwg/html/issues/2369
+                // See https://html.spec.whatwg.org/#nonce-attributes
+                // The `node.getAttribute` check was added for the sake of
+                // `jQuery.globalEval` so that it can fake a nonce-containing node
+                // via an object.
+                val = node[ i ] || node.getAttribute && node.getAttribute( i );
+                if ( val ) {
+                    script.setAttribute( i, val );
+                }
+            }
+        }
+        doc.head.appendChild( script ).parentNode.removeChild( script );
+
+        return this;
+    }
+
+    langx.mixin(scripter, {
+        /*
+         * Load a script from a url into the document.
+         * @param {} url
+         * @param {} loadedCallback
+         * @param {} errorCallback
+         */
+        loadJavaScript: function(url, loadedCallback, errorCallback) {
+            var script = scriptsByUrl[url];
+            if (!script) {
+                script = scriptsByUrl[url] = {
+                    state: 0, //0:unload,1:loaded,-1:loaderror
+                    loadedCallbacks: [],
+                    errorCallbacks: []
+                }
+            }
+
+            script.loadedCallbacks.push(loadedCallback);
+            script.errorCallbacks.push(errorCallback);
+
+            if (script.state === 1) {
+                script.node.onload();
+            } else if (script.state === -1) {
+                script.node.onerror();
+            } else {
+                var node = script.node = document.createElement("script"),
+                    id = script.id = (count++);
+
+                node.type = "text/javascript";
+                node.async = false;
+                node.defer = false;
+                startTime = new Date().getTime();
+                head.appendChild(node);
+
+                node.onload = function() {
+                        script.state = 1;
+
+                        var callbacks = script.loadedCallbacks,
+                            i = callbacks.length;
+
+                        while (i--) {
+                            callbacks[i]();
+                        }
+                        script.loadedCallbacks = [];
+                        script.errorCallbacks = [];
+                    },
+                    node.onerror = function() {
+                        script.state = -1;
+                        var callbacks = script.errorCallbacks,
+                            i = callbacks.length;
+
+                        while (i--) {
+                            callbacks[i]();
+                        }
+                        script.loadedCallbacks = [];
+                        script.errorCallbacks = [];
+                    };
+                node.src = url;
+
+                scriptElementsById[id] = node;
+            }
+            return script.id;
+        },
+        /*
+         * Remove the specified script from the document.
+         * @param {Number} id
+         */
+        deleteJavaScript: function(id) {
+            var node = scriptElementsById[id];
+            if (node) {
+                var url = node.src;
+                if (node.parentNode) {
+                    node.parentNode.remove(node);
+                }
+                delete scriptElementsById[id];
+                delete scriptsByUrl[url];
+            }
+        },
+
+        evaluate : evaluate,
+
+
+    });
+
+    return skylark.attach("langx.scripter", scripter);
+});
+define('skylark-langx-scripter/main',[
+	"./scripter"
+],function(scripter){
+	
+	return scripter;
+});
+define('skylark-langx-scripter', ['skylark-langx-scripter/main'], function (main) { return main; });
 
 define('skylark-domx-noder/noder',[
     "skylark-langx/skylark",
@@ -11448,7 +11628,7 @@ function removeSelfClosingTags(xml) {
         if (html === undefined) {
             return node.innerHTML;
         } else {
-            this.empty(node);
+            empty(node);
             html = html || "";
             if (langx.isString(html)) {
                 html = html.replace( rxhtmlTag, "<$1></$2>" );
@@ -15125,1367 +15305,254 @@ define('skylark-domx-data/main',[
 });
 define('skylark-domx-data', ['skylark-domx-data/main'], function (main) { return main; });
 
-define('skylark-domx-geom/geom',[
-    "skylark-langx/skylark",
-    "skylark-langx/langx",
-    "skylark-domx-noder",
-    "skylark-domx-styler"
-], function(skylark, langx, noder, styler) {
-  'use strict'
+define('skylark-langx-events/Emitter',[
+  "skylark-langx-types",
+  "skylark-langx-objects",
+  "skylark-langx-arrays",
+  "skylark-langx-klass",
+  "./events",
+  "./event",
+  "./listener"
+],function(types,objects,arrays,klass,events,Event,Listener){
+    var slice = Array.prototype.slice,
+        compact = arrays.compact,
+        isDefined = types.isDefined,
+        isPlainObject = types.isPlainObject,
+        isFunction = types.isFunction,
+        isString = types.isString,
+        isEmptyObject = types.isEmptyObject,
+        mixin = objects.mixin,
+        safeMixin = objects.safeMixin;
 
-    var rootNodeRE = /^(?:body|html)$/i,
-        px = langx.toPixel,
-        offsetParent = noder.offsetParent,
-        cachedScrollbarWidth;
-
-    function scrollbarWidth() {
-        if (cachedScrollbarWidth !== undefined) {
-            return cachedScrollbarWidth;
-        }
-        var w1, w2,
-            div = noder.createFragment("<div style=" +
-                "'display:block;position:absolute;width:200px;height:200px;overflow:hidden;'>" +
-                "<div style='height:300px;width:auto;'></div></div>")[0],
-            innerDiv = div.childNodes[0];
-
-        noder.append(document.body, div);
-
-        w1 = innerDiv.offsetWidth;
-
-        styler.css(div, "overflow", "scroll");
-
-        w2 = innerDiv.offsetWidth;
-
-        if (w1 === w2) {
-            w2 = div[0].clientWidth;
-        }
-
-        noder.remove(div);
-
-        return (cachedScrollbarWidth = w1 - w2);
-    }
-
-
-    function hasScrollbar() {
-        return document.body.scrollHeight > (window.innerHeight || document.documentElement.clientHeight);
-    }
-
-    /*
-     * Get the widths of each border of the specified element.
-     * @param {HTMLElement} elm
-     */
-    function borderExtents(elm) {
-        if (noder.isWindow(elm)) {
-            return {
-                left : 0,
-                top : 0,
-                right : 0,
-                bottom : 0
-            }
-        }        var s = getComputedStyle(elm);
+    function parse(event) {
+        var segs = ("" + event).split(".");
         return {
-            left: px(s.borderLeftWidth, elm),
-            top: px(s.borderTopWidth, elm),
-            right: px(s.borderRightWidth, elm),
-            bottom: px(s.borderBottomWidth, elm)
-        }
-    }
-
-    //viewport coordinate
-    /*
-     * Get or set the viewport position of the specified element border box.
-     * @param {HTMLElement} elm
-     * @param {PlainObject} coords
-     */
-    function boundingPosition(elm, coords) {
-        if (coords === undefined) {
-            return rootNodeRE.test(elm.nodeName) ? { top: 0, left: 0 } : elm.getBoundingClientRect();
-        } else {
-            var // Get *real* offsetParent
-                parent = offsetParent(elm),
-                // Get correct offsets
-                parentOffset = boundingPosition(parent),
-                mex = marginExtents(elm),
-                pbex = borderExtents(parent);
-
-            relativePosition(elm, {
-                top: coords.top - parentOffset.top - mex.top - pbex.top,
-                left: coords.left - parentOffset.left - mex.left - pbex.left
-            });
-            return this;
-        }
-    }
-
-    /*
-     * Get or set the viewport rect of the specified element border box.
-     * @param {HTMLElement} elm
-     * @param {PlainObject} coords
-     */
-    function boundingRect(elm, coords) {
-        if (coords === undefined) {
-            if (elm == window || elm == document.documentElement || elm == document.body){
-                return {
-                    top : 0,
-                    left : 0,
-                    bottom : window.innerHeight,
-                    right : window.innerWidth,
-                    height : window.innerHeight,
-                    width : window.innerWidth
-                };
-            } else if (elm.getBoundingClientRect) {
-                return elm.getBoundingClientRect();
-            }
-        } else {
-            boundingPosition(elm, coords);
-            size(elm, coords);
-            return this;
-        }
-    }
-
-    /*
-     * Get or set the height of the specified element client box.
-     * @param {HTMLElement} elm
-     * @param {Number} value
-     */
-    function clientHeight(elm, value) {
-        if (value == undefined) {
-            return clientSize(elm).height;
-        } else {
-            return clientSize(elm, {
-                height: value
-            });
-        }
-    }
-
-    /*
-     * Get or set the size of the specified element client box.
-     * @param {HTMLElement} elm
-     * @param {PlainObject} dimension
-     */
-    function clientSize(elm, dimension) {
-        if (dimension == undefined) {
-            return {
-                width: elm.clientWidth,
-                height: elm.clientHeight
-            }
-        } else {
-            var isBorderBox = (styler.css(elm, "box-sizing") === "border-box"),
-                props = {
-                    width: dimension.width,
-                    height: dimension.height
-                };
-            if (!isBorderBox) {
-                var pex = paddingExtents(elm);
-
-                if (props.width !== undefined) {
-                    props.width = props.width - pex.left - pex.right;
-                }
-
-                if (props.height !== undefined) {
-                    props.height = props.height - pex.top - pex.bottom;
-                }
-            } else {
-                var bex = borderExtents(elm);
-
-                if (props.width !== undefined) {
-                    props.width = props.width + bex.left + bex.right;
-                }
-
-                if (props.height !== undefined) {
-                    props.height = props.height + bex.top + bex.bottom;
-                }
-
-            }
-            styler.css(elm, props);
-            return this;
-        }
-        return {
-            width: elm.clientWidth,
-            height: elm.clientHeight
+            name: segs[0],
+            ns: segs.slice(1).join(" ")
         };
     }
 
-    /*
-     * Get or set the width of the specified element client box.
-     * @param {HTMLElement} elm
-     * @param {PlainObject} dimension
-     */
-    function clientWidth(elm, value) {
-        if (value == undefined) {
-            return clientSize(elm).width;
-        } else {
-            clientSize(elm, {
-                width: value
-            });
-            return this;
-        }
-    }
-
-    /*
-     * Get the rect of the specified element content box.
-     * @param {HTMLElement} elm
-     */
-    function contentRect(elm) {
-        var cs = clientSize(elm),
-            pex = paddingExtents(elm);
-
-
-        //// On Opera, offsetLeft includes the parent's border
-        //if(has("opera")){
-        //    pe.l += be.l;
-        //    pe.t += be.t;
-        //}
-        return {
-            left: pex.left,
-            top: pex.top,
-            width: cs.width - pex.left - pex.right,
-            height: cs.height - pex.top - pex.bottom
-        };
-    }
-
-    /*
-     * Get the document size.
-     * @param {HTMLDocument} doc
-     */
-    function getDocumentSize(doc) {
-        var documentElement = doc.documentElement,
-            body = doc.body,
-            max = Math.max,
-            scrollWidth = max(documentElement.scrollWidth, body.scrollWidth),
-            clientWidth = max(documentElement.clientWidth, body.clientWidth),
-            offsetWidth = max(documentElement.offsetWidth, body.offsetWidth),
-            scrollHeight = max(documentElement.scrollHeight, body.scrollHeight),
-            clientHeight = max(documentElement.clientHeight, body.clientHeight),
-            offsetHeight = max(documentElement.offsetHeight, body.offsetHeight);
-
-        return {
-            width: scrollWidth < offsetWidth ? clientWidth : scrollWidth,
-            height: scrollHeight < offsetHeight ? clientHeight : scrollHeight
-        };
-    }
-
-    /*
-     * Get the document size.
-     * @param {HTMLElement} elm
-     * @param {Number} value
-     */
-    function height(elm, value) {
-        if (value == undefined) {
-            return size(elm).height;
-        } else {
-            size(elm, {
-                height: value
-            });
-            return this;
-        }
-    }
-
-
-
-    function inview(elm, cushion) {
-        function calibrate(coords, cushion) {
-            var o = {};
-            cushion = +cushion || 0;
-            o.width = (o.right = coords.right + cushion) - (o.left = coords.left - cushion);
-            o.height = (o.bottom = coords.bottom + cushion) - (o.top = coords.top - cushion);
-            return o;
-        }
-
-        var r = calibrate(boundingRect(elm), cushion),
-            vsize = viewportSize();
-
-        return !!r && r.bottom >= 0 && r.right >= 0 && r.top <= vsize.height && r.left <= vsize.width;
-    }
-
-
-    /*
-     * Get the widths of each margin of the specified element.
-     * @param {HTMLElement} elm
-     */
-    function marginExtents(elm) {
-        if (noder.isWindow(elm)) {
-            return {
-                left : 0,
-                top : 0,
-                right : 0,
-                bottom : 0
-            }
-        }
-        var s = getComputedStyle(elm);
-        return {
-            left: px(s.marginLeft),
-            top: px(s.marginTop),
-            right: px(s.marginRight),
-            bottom: px(s.marginBottom),
-        }
-    }
-
-
-    function marginRect(elm) {
-        var obj = relativeRect(elm),
-            me = marginExtents(elm);
-
-        return {
-            left: obj.left,
-            top: obj.top,
-            width: obj.width + me.left + me.right,
-            height: obj.height + me.top + me.bottom
-        };
-    }
-
-
-    function marginSize(elm) {
-        var obj = size(elm),
-            me = marginExtents(elm);
-
-        return {
-            width: obj.width + me.left + me.right,
-            height: obj.height + me.top + me.bottom
-        };
-    }
-
-    /*
-     * Get the widths of each padding of the specified element.
-     * @param {HTMLElement} elm
-     */
-    function paddingExtents(elm) {
-        if (noder.isWindow(elm)) {
-            return {
-                left : 0,
-                top : 0,
-                right : 0,
-                bottom : 0
-            }
-        }
-        var s = getComputedStyle(elm);
-        return {
-            left: px(s.paddingLeft),
-            top: px(s.paddingTop),
-            right: px(s.paddingRight),
-            bottom: px(s.paddingBottom),
-        }
-    }
-
-    /*
-     * Get or set the document position of the specified element border box.
-     * @param {HTMLElement} elm
-     * @param {PlainObject} coords
-     */
-    //coordinate to the document
-    function pagePosition(elm, coords) {
-        if (coords === undefined) {
-            var obj = elm.getBoundingClientRect(),
-                w = elm.ownerDocument.defaultView;
-            return {
-                left: obj.left + w.pageXOffset,
-                top: obj.top + w.pageYOffset
-            }
-        } else {
-            var // Get *real* offsetParent
-                parent = offsetParent(elm),
-                // Get correct offsets
-                parentOffset = pagePosition(parent),
-                mex = marginExtents(elm),
-                pbex = borderExtents(parent);
-
-            relativePosition(elm, {
-                top: coords.top - parentOffset.top - mex.top - pbex.top,
-                left: coords.left - parentOffset.left - mex.left - pbex.left
-            });
-            return this;
-        }
-    }
-
-    /*
-     * Get or set the document rect of the specified element border box.
-     * @param {HTMLElement} elm
-     * @param {PlainObject} coords
-     */
-    function pageRect(elm, coords) {
-        if (coords === undefined) {
-            var obj = elm.getBoundingClientRect(),
-                w = elm.ownerDocument.defaultView;
-            return {
-                left: obj.left + w.pageXOffset,
-                top: obj.top + w.pageYOffset,
-                width: Math.round(obj.width),
-                height: Math.round(obj.height)
-            }
-        } else {
-            pagePosition(elm, coords);
-            size(elm, coords);
-            return this;
-        }
-    }
-
-    /*
-     * Get or set the position of the specified element border box , relative to parent element.
-     * @param {HTMLElement} elm
-     * @param {PlainObject} coords
-     */
-    // coordinate relative to it's parent
-    function relativePosition(elm, coords) {
-        if (coords == undefined) {
-            var // Get *real* offsetParent
-                parent = offsetParent(elm),
-                // Get correct offsets
-                offset = boundingPosition(elm),
-                parentOffset = boundingPosition(parent),
-                mex = marginExtents(elm),
-                pbex = borderExtents(parent);
-
-            // Subtract parent offsets and element margins
-            return {
-                top: offset.top - parentOffset.top - pbex.top - mex.top,
-                left: offset.left - parentOffset.left - pbex.left - mex.left
-            }
-        } else {
-            var // Get *real* offsetParent
-                parent = offsetParent(elm);
-
-            var props = {
-                top: coords.top,
-                left: coords.left
-            };
-
-            if (langx.isDefined(props.top)) {
-                props.top = props.top + (scrollTop(parent) || 0);
-            }
-
-            if (langx.isDefined(props.left)) {
-                props.left = props.left + (scrollLeft(parent) || 0);
-            } 
-
-
-            if (styler.css(elm, "position") == "static") {
-                props['position'] = "relative";
-            }
-
-
-            styler.css(elm, props);
-            return this;
-        }
-    }
-
-    /*
-     * Get or set the rect of the specified element border box , relatived to parent element.
-     * @param {HTMLElement} elm
-     * @param {PlainObject} coords
-     */
-    function relativeRect(elm, coords) {
-        if (coords === undefined) {
-            var // Get *real* offsetParent
-                parent = offsetParent(elm),
-                // Get correct offsets
-                offset = boundingRect(elm),
-                parentOffset = boundingPosition(parent),
-                mex = marginExtents(elm),
-                pbex = borderExtents(parent);
-
-            // Subtract parent offsets and element margins
-            return {
-                top: offset.top - parentOffset.top - pbex.top, // - mex.top,
-                left: offset.left - parentOffset.left - pbex.left, // - mex.left,
-                width: offset.width,
-                height: offset.height
-            }
-        } else {
-            relativePosition(elm, coords);
-            size(elm, coords);
-            return this;
-        }
-    }
-    /*
-     * Scroll the specified element into view.
-     * @param {HTMLElement} elm
-     * @param {} align
-     */
-    function scrollIntoView(elm, align) {
-        function getOffset(elm, rootElm) {
-            var x, y, parent = elm;
-
-            x = y = 0;
-            while (parent && parent != rootElm && parent.nodeType) {
-                x += parent.offsetLeft || 0;
-                y += parent.offsetTop || 0;
-                parent = parent.offsetParent;
-            }
-
-            return { x: x, y: y };
-        }
-
-        var parentElm = elm.parentNode;
-        var x, y, width, height, parentWidth, parentHeight;
-        var pos = getOffset(elm, parentElm);
-
-        x = pos.x;
-        y = pos.y;
-        width = elm.offsetWidth;
-        height = elm.offsetHeight;
-        parentWidth = parentElm.clientWidth;
-        parentHeight = parentElm.clientHeight;
-
-        if (align == "end") {
-            x -= parentWidth - width;
-            y -= parentHeight - height;
-        } else if (align == "center") {
-            x -= (parentWidth / 2) - (width / 2);
-            y -= (parentHeight / 2) - (height / 2);
-        }
-
-        parentElm.scrollLeft = x;
-        parentElm.scrollTop = y;
-
-        return this;
-    }
-    /*
-     * Get or set the current horizontal position of the scroll bar for the specified element.
-     * @param {HTMLElement} elm
-     * @param {Number} value
-     */
-    function scrollLeft(elm, value) {
-        if (elm.nodeType === 9) {
-            elm = elm.defaultView;
-        } else if (elm == document.body) {
-            elm = document.scrollingElement  || document.documentElement;
-        }
-        var hasScrollLeft = "scrollLeft" in elm;
-        if (value === undefined) {
-            return hasScrollLeft ? elm.scrollLeft : elm.pageXOffset
-        } else {
-            if (hasScrollLeft) {
-                elm.scrollLeft = value;
-            } else {
-                elm.scrollTo(value, elm.scrollY);
-            }
-            return this;
-        }
-    }
-    /*
-     * Get or the current vertical position of the scroll bar for the specified element.
-     * @param {HTMLElement} elm
-     * @param {Number} value
-     */
-    function scrollTop(elm, value) {
-        if (elm.nodeType === 9) {
-            elm = elm.defaultView;
-        } else if (elm == document.body) {
-            elm = document.scrollingElement  || document.documentElement;
-        }
-
-        var hasScrollTop = "scrollTop" in elm;
-
-        if (value === undefined) {
-            return hasScrollTop ? elm.scrollTop : elm.pageYOffset
-        } else {
-            if (hasScrollTop) {
-                elm.scrollTop = value;
-            } else {
-                elm.scrollTo(elm.scrollX, value);
-            }
-            return this;
-        }
-    }
-
-    function scrollBy(elm, x, y) {
-        elm.scrollLeft += x;
-        elm.scrollTop += y;
-    }
-
-
-    /*
-     * Get or set the size of the specified element border box.
-     * @param {HTMLElement} elm
-     * @param {PlainObject}dimension
-     */
-    function size(elm, dimension) {
-        if (dimension == undefined) {
-            if (langx.isWindow(elm)) {
-                return {
-                    width: elm.innerWidth,
-                    height: elm.innerHeight
-                }
-
-            } else if (langx.isDocument(elm)) {
-                return getDocumentSize(document);
-            } else {
-                return {
-                    width: elm.offsetWidth,
-                    height: elm.offsetHeight
-                }
-            }
-        } else {
-            var isBorderBox = (styler.css(elm, "box-sizing") === "border-box"),
-                props = {
-                    width: dimension.width,
-                    height: dimension.height
-                };
-            if (!isBorderBox) {
-                var pex = paddingExtents(elm),
-                    bex = borderExtents(elm);
-
-                if (props.width !== undefined && props.width !== "" && props.width !== null) {
-                    props.width = props.width - pex.left - pex.right - bex.left - bex.right;
-                }
-
-                if (props.height !== undefined && props.height !== "" && props.height !== null) {
-                    props.height = props.height - pex.top - pex.bottom - bex.top - bex.bottom;
-                }
-            }
-            styler.css(elm, props);
-            return this;
-        }
-    }
-
-
-    function viewportSize(win) {
-        win = win || window;
-
-        return boundingRect(win);
-    }
-
-    /*
-     * Get or set the size of the specified element border box.
-     * @param {HTMLElement} elm
-     * @param {Number} value
-     */
-    function width(elm, value) {
-        if (value == undefined) {
-            return size(elm).width;
-        } else {
-            size(elm, {
-                width: value
-            });
-            return this;
-        }
-    }
-
-    function testAxis(elm) {
-       
-        var top = elm.offsetTop;
-        var left = elm.offsetLeft;
-        var width = elm.offsetWidth;
-        var height = elm.offsetHeight;
-
-        while(elm.offsetParent) {
-            elm = elm.offsetParent;
-            top += elm.offsetTop;
-            left += elm.offsetLeft;
-        }
-
-        var result = {x: 0, y: 0};
-
-        //Over the top of the window
-        if(top < window.pageYOffset) {
-            result.y = top - window.pageYOffset;
-        }
-        //Bellow the window
-        else if((top + height) > (window.pageYOffset + window.innerHeight))
-        {
-            result.y = (top + height) - (window.pageYOffset + window.innerHeight);
-        }
-
-        //Left to the window
-        if(left < window.pageXOffset) {
-            result.x = left - window.pageXOffset;
-        }
-        //Right to the window
-        else if((left + width) > (window.pageXOffset + window.innerWidth))
-        {
-            result.x = (left + width) - (window.pageXOffset + window.innerWidth);
-        }
-
-        return result;
-    };    
-
-    function geom() {
-        return geom;
-    }
-
-    langx.mixin(geom, {
-        borderExtents: borderExtents,
-        //viewport coordinate
-        boundingPosition: boundingPosition,
-
-        boundingRect: boundingRect,
-
-        clientHeight: clientHeight,
-
-        clientSize: clientSize,
-
-        clientWidth: clientWidth,
-
-        contentRect: contentRect,
-
-        getDocumentSize: getDocumentSize,
-
-        hasScrollbar,
-
-        height: height,
-
-        inview,
-
-        marginExtents: marginExtents,
-
-        marginRect: marginRect,
-
-        marginSize: marginSize,
-
-        offsetParent: offsetParent,
-
-        paddingExtents: paddingExtents,
-
-        //coordinate to the document
-        pagePosition: pagePosition,
-
-        pageRect: pageRect,
-
-        // coordinate relative to it's parent
-        relativePosition: relativePosition,
-
-        relativeRect: relativeRect,
-
-        scrollbarWidth: scrollbarWidth,
-
-        scrollIntoView: scrollIntoView,
-
-        scrollLeft: scrollLeft,
-
-        scrollTop: scrollTop,
-
-        scrollBy,
-            
-        size: size,
-
-        testAxis,
-
-        viewportSize,
-
-        width: width
-    });
-
-
-
-    return skylark.attach("domx.geom", geom);
-});
-define('skylark-domx-geom/posit',[
-    "skylark-langx/langx",
-    "skylark-domx-noder",
-    "skylark-domx-styler",
-	"./geom"
-],function(langx,noder,styler,geom){
-  'use strict'
-
-
-
-
-    var max = Math.max,
-        abs = Math.abs,
-        rhorizontal = /left|center|right/,
-        rvertical = /top|center|bottom/,
-        roffset = /[\+\-]\d+(\.[\d]+)?%?/,
-        rposition = /^\w+/,
-        rpercent = /%$/;
-
-    function getOffsets( offsets, width, height ) {
-        return [
-            parseFloat( offsets[ 0 ] ) * ( rpercent.test( offsets[ 0 ] ) ? width / 100 : 1 ),
-            parseFloat( offsets[ 1 ] ) * ( rpercent.test( offsets[ 1 ] ) ? height / 100 : 1 )
-        ];
-    }
-
-    function parseCss( element, property ) {
-        return parseInt( styler.css( element, property ), 10 ) || 0;
-    }
-
-    function getDimensions( raw ) {
-        if ( raw.nodeType === 9 ) {
-            return {
-                size: size(raw),
-                offset: { top: 0, left: 0 }
-            };
-        }
-        if ( noder.isWindow( raw ) ) {
-            return {
-                size: geom.size(raw),
-                offset: { 
-                    top: geom.scrollTop(raw), 
-                    left: geom.scrollLeft(raw) 
-                }
-            };
-        }
-        if ( raw.preventDefault ) {
-            return {
-                size : {
-                    width: 0,
-                    height: 0
-                },
-                offset: { 
-                    top: raw.pageY, 
-                    left: raw.pageX 
-                }
-            };
-        }
-        return {
-            size: geom.size(raw),
-            offset: geom.pagePosition(raw)
-        };
-    }
-
-    function getScrollInfo( within ) {
-        var overflowX = within.isWindow || within.isDocument ? "" :
-                styler.css(within.element,"overflow-x" ),
-            overflowY = within.isWindow || within.isDocument ? "" :
-                styler.css(within.element,"overflow-y" ),
-            hasOverflowX = overflowX === "scroll" ||
-                ( overflowX === "auto" && within.width < geom.scrollWidth(within.element) ),
-            hasOverflowY = overflowY === "scroll" ||
-                ( overflowY === "auto" && within.height < geom.scrollHeight(within.element));
-        return {
-            width: hasOverflowY ? geom.scrollbarWidth() : 0,
-            height: hasOverflowX ? geom.scrollbarWidth() : 0
-        };
-    }
-
-    function getWithinInfo( element ) {
-        var withinElement = element || window,
-            isWindow = noder.isWindow( withinElement),
-            isDocument = !!withinElement && withinElement.nodeType === 9,
-            hasOffset = !isWindow && !isDocument,
-            msize = marginSize(withinElement);
-        return {
-            element: withinElement,
-            isWindow: isWindow,
-            isDocument: isDocument,
-            offset: hasOffset ? geom.pagePosition(element) : { left: 0, top: 0 },
-            scrollLeft: geom.scrollLeft(withinElement),
-            scrollTop: geom.scrollTop(withinElement),
-            width: msize.width,
-            height: msize.height
-        };
-    }
-
-    function posit(elm,options ) {
-        // Make a copy, we don't want to modify arguments
-        options = langx.extend( {}, options );
-
-        var atOffset, targetWidth, targetHeight, targetOffset, basePosition, dimensions,
-            target = options.of,
-            within = getWithinInfo( options.within ),
-            scrollInfo = getScrollInfo( within ),
-            collision = ( options.collision || "flip" ).split( " " ),
-            offsets = {};
-
-        dimensions = getDimensions( target );
-        if ( target.preventDefault ) {
-
-            // Force left top to allow flipping
-            options.at = "left top";
-        }
-        targetWidth = dimensions.size.width;
-        targetHeight = dimensions.size.height;
-        targetOffset = dimensions.offset;
-
-        // Clone to reuse original targetOffset later
-        basePosition = langx.extend( {}, targetOffset );
-
-        // Force my and at to have valid horizontal and vertical positions
-        // if a value is missing or invalid, it will be converted to center
-        langx.each( [ "my", "at" ], function() {
-            var pos = ( options[ this ] || "" ).split( " " ),
-                horizontalOffset,
-                verticalOffset;
-
-            if ( pos.length === 1 ) {
-                pos = rhorizontal.test( pos[ 0 ] ) ?
-                    pos.concat( [ "center" ] ) :
-                    rvertical.test( pos[ 0 ] ) ?
-                        [ "center" ].concat( pos ) :
-                        [ "center", "center" ];
-            }
-            pos[ 0 ] = rhorizontal.test( pos[ 0 ] ) ? pos[ 0 ] : "center";
-            pos[ 1 ] = rvertical.test( pos[ 1 ] ) ? pos[ 1 ] : "center";
-
-            // Calculate offsets
-            horizontalOffset = roffset.exec( pos[ 0 ] );
-            verticalOffset = roffset.exec( pos[ 1 ] );
-            offsets[ this ] = [
-                horizontalOffset ? horizontalOffset[ 0 ] : 0,
-                verticalOffset ? verticalOffset[ 0 ] : 0
-            ];
-
-            // Reduce to just the positions without the offsets
-            options[ this ] = [
-                rposition.exec( pos[ 0 ] )[ 0 ],
-                rposition.exec( pos[ 1 ] )[ 0 ]
-            ];
-        } );
-
-        // Normalize collision option
-        if ( collision.length === 1 ) {
-            collision[ 1 ] = collision[ 0 ];
-        }
-
-        if ( options.at[ 0 ] === "right" ) {
-            basePosition.left += targetWidth;
-        } else if ( options.at[ 0 ] === "center" ) {
-            basePosition.left += targetWidth / 2;
-        }
-
-        if ( options.at[ 1 ] === "bottom" ) {
-            basePosition.top += targetHeight;
-        } else if ( options.at[ 1 ] === "center" ) {
-            basePosition.top += targetHeight / 2;
-        }
-
-        atOffset = getOffsets( offsets.at, targetWidth, targetHeight );
-        basePosition.left += atOffset[ 0 ];
-        basePosition.top += atOffset[ 1 ];
-
-        return ( function(elem) {
-            var collisionPosition, using,
-                msize = geom.marginSize(elem),
-                elemWidth = msize.width,
-                elemHeight = msize.height,
-                marginLeft = parseCss( elem, "marginLeft" ),
-                marginTop = parseCss( elem, "marginTop" ),
-                collisionWidth = elemWidth + marginLeft + parseCss( elem, "marginRight" ) +
-                    scrollInfo.width,
-                collisionHeight = elemHeight + marginTop + parseCss( elem, "marginBottom" ) +
-                    scrollInfo.height,
-                position = langx.extend( {}, basePosition ),
-                myOffset = getOffsets( offsets.my, msize.width, msize.height);
-
-            if ( options.my[ 0 ] === "right" ) {
-                position.left -= elemWidth;
-            } else if ( options.my[ 0 ] === "center" ) {
-                position.left -= elemWidth / 2;
-            }
-
-            if ( options.my[ 1 ] === "bottom" ) {
-                position.top -= elemHeight;
-            } else if ( options.my[ 1 ] === "center" ) {
-                position.top -= elemHeight / 2;
-            }
-
-            position.left += myOffset[ 0 ];
-            position.top += myOffset[ 1 ];
-
-            collisionPosition = {
-                marginLeft: marginLeft,
-                marginTop: marginTop
-            };
-
-            langx.each( [ "left", "top" ], function( i, dir ) {
-                if ( positions[ collision[ i ] ] ) {
-                    positions[ collision[ i ] ][ dir ]( position, {
-                        targetWidth: targetWidth,
-                        targetHeight: targetHeight,
-                        elemWidth: elemWidth,
-                        elemHeight: elemHeight,
-                        collisionPosition: collisionPosition,
-                        collisionWidth: collisionWidth,
-                        collisionHeight: collisionHeight,
-                        offset: [ atOffset[ 0 ] + myOffset[ 0 ], atOffset [ 1 ] + myOffset[ 1 ] ],
-                        my: options.my,
-                        at: options.at,
-                        within: within,
-                        elem: elem
-                    } );
-                }
-            } );
-
-            if ( options.using ) {
-
-                // Adds feedback as second argument to using callback, if present
-                using = function( props ) {
-                    var left = targetOffset.left - position.left,
-                        right = left + targetWidth - elemWidth,
-                        top = targetOffset.top - position.top,
-                        bottom = top + targetHeight - elemHeight,
-                        feedback = {
-                            target: {
-                                element: target,
-                                left: targetOffset.left,
-                                top: targetOffset.top,
-                                width: targetWidth,
-                                height: targetHeight
-                            },
-                            element: {
-                                element: elem,
-                                left: position.left,
-                                top: position.top,
-                                width: elemWidth,
-                                height: elemHeight
-                            },
-                            horizontal: right < 0 ? "left" : left > 0 ? "right" : "center",
-                            vertical: bottom < 0 ? "top" : top > 0 ? "bottom" : "middle"
-                        };
-                    if ( targetWidth < elemWidth && abs( left + right ) < targetWidth ) {
-                        feedback.horizontal = "center";
-                    }
-                    if ( targetHeight < elemHeight && abs( top + bottom ) < targetHeight ) {
-                        feedback.vertical = "middle";
-                    }
-                    if ( max( abs( left ), abs( right ) ) > max( abs( top ), abs( bottom ) ) ) {
-                        feedback.important = "horizontal";
-                    } else {
-                        feedback.important = "vertical";
-                    }
-                    options.using.call( this, props, feedback );
-                };
-            }
-
-            geom.pagePosition(elem, langx.extend( position, { using: using } ));
-        })(elm);
-    }
-
-    var positions = {
-        fit: {
-            left: function( position, data ) {
-                var within = data.within,
-                    withinOffset = within.isWindow ? within.scrollLeft : within.offset.left,
-                    outerWidth = within.width,
-                    collisionPosLeft = position.left - data.collisionPosition.marginLeft,
-                    overLeft = withinOffset - collisionPosLeft,
-                    overRight = collisionPosLeft + data.collisionWidth - outerWidth - withinOffset,
-                    newOverRight;
-
-                // Element is wider than within
-                if ( data.collisionWidth > outerWidth ) {
-
-                    // Element is initially over the left side of within
-                    if ( overLeft > 0 && overRight <= 0 ) {
-                        newOverRight = position.left + overLeft + data.collisionWidth - outerWidth -
-                            withinOffset;
-                        position.left += overLeft - newOverRight;
-
-                    // Element is initially over right side of within
-                    } else if ( overRight > 0 && overLeft <= 0 ) {
-                        position.left = withinOffset;
-
-                    // Element is initially over both left and right sides of within
-                    } else {
-                        if ( overLeft > overRight ) {
-                            position.left = withinOffset + outerWidth - data.collisionWidth;
-                        } else {
-                            position.left = withinOffset;
-                        }
-                    }
-
-                // Too far left -> align with left edge
-                } else if ( overLeft > 0 ) {
-                    position.left += overLeft;
-
-                // Too far right -> align with right edge
-                } else if ( overRight > 0 ) {
-                    position.left -= overRight;
-
-                // Adjust based on position and margin
-                } else {
-                    position.left = max( position.left - collisionPosLeft, position.left );
-                }
-            },
-            top: function( position, data ) {
-                var within = data.within,
-                    withinOffset = within.isWindow ? within.scrollTop : within.offset.top,
-                    outerHeight = data.within.height,
-                    collisionPosTop = position.top - data.collisionPosition.marginTop,
-                    overTop = withinOffset - collisionPosTop,
-                    overBottom = collisionPosTop + data.collisionHeight - outerHeight - withinOffset,
-                    newOverBottom;
-
-                // Element is taller than within
-                if ( data.collisionHeight > outerHeight ) {
-
-                    // Element is initially over the top of within
-                    if ( overTop > 0 && overBottom <= 0 ) {
-                        newOverBottom = position.top + overTop + data.collisionHeight - outerHeight -
-                            withinOffset;
-                        position.top += overTop - newOverBottom;
-
-                    // Element is initially over bottom of within
-                    } else if ( overBottom > 0 && overTop <= 0 ) {
-                        position.top = withinOffset;
-
-                    // Element is initially over both top and bottom of within
-                    } else {
-                        if ( overTop > overBottom ) {
-                            position.top = withinOffset + outerHeight - data.collisionHeight;
-                        } else {
-                            position.top = withinOffset;
-                        }
-                    }
-
-                // Too far up -> align with top
-                } else if ( overTop > 0 ) {
-                    position.top += overTop;
-
-                // Too far down -> align with bottom edge
-                } else if ( overBottom > 0 ) {
-                    position.top -= overBottom;
-
-                // Adjust based on position and margin
-                } else {
-                    position.top = max( position.top - collisionPosTop, position.top );
-                }
-            }
-        },
-        flip: {
-            left: function( position, data ) {
-                var within = data.within,
-                    withinOffset = within.offset.left + within.scrollLeft,
-                    outerWidth = within.width,
-                    offsetLeft = within.isWindow ? within.scrollLeft : within.offset.left,
-                    collisionPosLeft = position.left - data.collisionPosition.marginLeft,
-                    overLeft = collisionPosLeft - offsetLeft,
-                    overRight = collisionPosLeft + data.collisionWidth - outerWidth - offsetLeft,
-                    myOffset = data.my[ 0 ] === "left" ?
-                        -data.elemWidth :
-                        data.my[ 0 ] === "right" ?
-                            data.elemWidth :
-                            0,
-                    atOffset = data.at[ 0 ] === "left" ?
-                        data.targetWidth :
-                        data.at[ 0 ] === "right" ?
-                            -data.targetWidth :
-                            0,
-                    offset = -2 * data.offset[ 0 ],
-                    newOverRight,
-                    newOverLeft;
-
-                if ( overLeft < 0 ) {
-                    newOverRight = position.left + myOffset + atOffset + offset + data.collisionWidth -
-                        outerWidth - withinOffset;
-                    if ( newOverRight < 0 || newOverRight < abs( overLeft ) ) {
-                        position.left += myOffset + atOffset + offset;
-                    }
-                } else if ( overRight > 0 ) {
-                    newOverLeft = position.left - data.collisionPosition.marginLeft + myOffset +
-                        atOffset + offset - offsetLeft;
-                    if ( newOverLeft > 0 || abs( newOverLeft ) < overRight ) {
-                        position.left += myOffset + atOffset + offset;
-                    }
-                }
-            },
-            top: function( position, data ) {
-                var within = data.within,
-                    withinOffset = within.offset.top + within.scrollTop,
-                    outerHeight = within.height,
-                    offsetTop = within.isWindow ? within.scrollTop : within.offset.top,
-                    collisionPosTop = position.top - data.collisionPosition.marginTop,
-                    overTop = collisionPosTop - offsetTop,
-                    overBottom = collisionPosTop + data.collisionHeight - outerHeight - offsetTop,
-                    top = data.my[ 1 ] === "top",
-                    myOffset = top ?
-                        -data.elemHeight :
-                        data.my[ 1 ] === "bottom" ?
-                            data.elemHeight :
-                            0,
-                    atOffset = data.at[ 1 ] === "top" ?
-                        data.targetHeight :
-                        data.at[ 1 ] === "bottom" ?
-                            -data.targetHeight :
-                            0,
-                    offset = -2 * data.offset[ 1 ],
-                    newOverTop,
-                    newOverBottom;
-                if ( overTop < 0 ) {
-                    newOverBottom = position.top + myOffset + atOffset + offset + data.collisionHeight -
-                        outerHeight - withinOffset;
-                    if ( newOverBottom < 0 || newOverBottom < abs( overTop ) ) {
-                        position.top += myOffset + atOffset + offset;
-                    }
-                } else if ( overBottom > 0 ) {
-                    newOverTop = position.top - data.collisionPosition.marginTop + myOffset + atOffset +
-                        offset - offsetTop;
-                    if ( newOverTop > 0 || abs( newOverTop ) < overBottom ) {
-                        position.top += myOffset + atOffset + offset;
-                    }
-                }
-            }
-        },
-        flipfit: {
-            left: function() {
-                positions.flip.left.apply( this, arguments );
-                positions.fit.left.apply( this, arguments );
-            },
-            top: function() {
-                positions.flip.top.apply( this, arguments );
-                positions.fit.top.apply( this, arguments );
-            }
-        }
-    };
-
-    return geom.posit = posit;
-});
-define('skylark-domx-geom/scrollToTop',[
-    "skylark-langx/langx",
-    "skylark-domx-styler",
-    "./geom"
-],function(langx,styler,geom) {
-    /*   
-     * Set the vertical position of the scroll bar for an element.
-     * @param {Object} elm  
-     * @param {Number or String} pos
-     * @param {Number or String} speed
-     * @param {Function} callback
-     */
-    function scrollToTop(elm, pos, speed, callback) {
-        var scrollFrom = parseInt(elm.scrollTop),
-            i = 0,
-            runEvery = 5, // run every 5ms
-            freq = speed * 1000 / runEvery,
-            scrollTo = parseInt(pos);
-
-        var interval = setInterval(function() {
-            i++;
-
-            if (i <= freq) elm.scrollTop = (scrollTo - scrollFrom) / freq * i + scrollFrom;
-
-            if (i >= freq + 1) {
-                clearInterval(interval);
-                if (callback) langx.debounce(callback, 1000)();
-            }
-        }, runEvery);
-
-        return this;
-    }
-
-    return geom.scrollToTop = scrollToTop;
-});
-define('skylark-domx-geom/main',[
-    "skylark-langx/langx",
-    "./geom",
-    "skylark-domx-velm",
-    "skylark-domx-query",
-    "./posit",
-    "./scrollToTop"
-],function(langx,geom,velm,$){
-   // from ./geom
-    velm.delegate([
-        "borderExtents",
-        "boundingPosition",
-        "boundingRect",
-        "clientHeight",
-        "clientSize",
-        "clientWidth",
-        "contentRect",
-        "height",
-        "marginExtents",
-        "marginRect",
-        "marginSize",
-        "offsetParent",
-        "paddingExtents",
-        "pagePosition",
-        "pageRect",
-        "relativePosition",
-        "relativeRect",
-        "scrollIntoView",
-        "scrollLeft",
-        "scrollTop",
-        "pageSize",
-        "width"
-    ], geom,{
-        "pageSize" : "size"
-    });
-
-    $.fn.offset = $.wraps.wrapper_value(geom.pagePosition, geom, geom.pagePosition);
-
-    $.fn.scrollTop = $.wraps.wrapper_value(geom.scrollTop, geom);
-
-    $.fn.scrollLeft = $.wraps.wrapper_value(geom.scrollLeft, geom);
-
-    $.fn.position =  function(options) {
-        if (!this.length) {
-            return this;
-        }
-
-        if (options) {
-            if (options.of && options.of.length) {
-                options = langx.clone(options);
-                options.of = options.of[0];
-            }
-            return this.each( function() {
-                geom.posit(this,options);
-            });
-        } else {
-            var elem = this[0];
-
-            return geom.relativePosition(elem);
-
-        }             
-    };
-
-    $.fn.offsetParent = $.wraps.wrapper_map(geom.offsetParent, geom);
-
-
-    $.fn.pageSize = $.wraps.wrapper_value(geom.size, geom);
-
-    $.fn.width = $.wraps.wrapper_value(geom.width, geom, geom.width);
-
-    $.fn.height = $.wraps.wrapper_value(geom.height, geom, geom.height);
-
-    $.fn.clientSize = $.wraps.wrapper_value(geom.clientSize, geom.clientSize);
     
-    ['width', 'height'].forEach(function(dimension) {
-        var offset, Dimension = dimension.replace(/./, function(m) {
-            return m[0].toUpperCase()
-        });
+    var queues  = new Map();
 
-        $.fn['outer' + Dimension] = function(margin, value) {
-            if (arguments.length) {
-                if (typeof margin !== 'boolean') {
-                    value = margin;
-                    margin = false;
-                }
+
+    var Emitter = Listener.inherit({
+        _prepareArgs : function(e,args) {
+            if (isDefined(args)) {
+                args = [e].concat(args);
             } else {
-                margin = false;
-                value = undefined;
+                args = [e];
+            }
+            return args;
+        },
+
+        on: function(events, selector, data, callback, ctx, /*used internally*/ one) {
+            var self = this,
+                _hub = this._hub || (this._hub = {});
+
+            if (isPlainObject(events)) {
+                ctx = callback;
+                each(events, function(type, fn) {
+                    self.on(type, selector, data, fn, ctx, one);
+                });
+                return this;
             }
 
-            if (value === undefined) {
-                var el = this[0];
-                if (!el) {
-                    return undefined;
+            if (!isString(selector) && !isFunction(callback)) {
+                ctx = callback;
+                callback = data;
+                data = selector;
+                selector = undefined;
+            }
+
+            if (isFunction(data)) {
+                ctx = callback;
+                callback = data;
+                data = null;
+            }
+
+            if (!callback ) {
+                throw new Error("No callback function");
+            } else if (!isFunction(callback)) {
+                throw new Error("The callback  is not afunction");
+            }
+
+            if (isString(events)) {
+                events = events.split(/\s/)
+            }
+
+            events.forEach(function(event) {
+                var parsed = parse(event),
+                    name = parsed.name,
+                    ns = parsed.ns;
+
+                (_hub[name] || (_hub[name] = [])).push({
+                    fn: callback,
+                    selector: selector,
+                    data: data,
+                    ctx: ctx,
+                    ns : ns,
+                    one: one
+                });
+            });
+
+            return this;
+        },
+
+        one: function(events, selector, data, callback, ctx) {
+            return this.on(events, selector, data, callback, ctx, 1);
+        },
+
+        emit: function(e /*,argument list*/ ) {
+            if (!this._hub) {
+                return this;
+            }
+
+            var self = this;
+
+            if (isString(e)) {
+                e = new Event(e); //new CustomEvent(e);
+            }
+
+            Object.defineProperty(e,"target",{
+                value : this
+            });
+
+            var args = slice.call(arguments, 1);
+
+            args = this._prepareArgs(e,args);
+
+            [e.type || e.name, "all"].forEach(function(eventName) {
+                var parsed = parse(eventName),
+                    name = parsed.name,
+                    ns = parsed.ns;
+
+                var listeners = self._hub[name];
+                if (!listeners) {
+                    return;
                 }
-                var cb = geom.size(el);
-                if (margin) {
-                    var me = geom.marginExtents(el);
-                    cb.width = cb.width + me.left + me.right;
-                    cb.height = cb.height + me.top + me.bottom;
+
+                var len = listeners.length,
+                    reCompact = false;
+
+                for (var i = 0; i < len; i++) {
+                    if (e.isImmediatePropagationStopped && e.isImmediatePropagationStopped()) {
+                        return this;
+                    }
+                    var listener = listeners[i];
+                    if (ns && (!listener.ns ||  !listener.ns.startsWith(ns))) {
+                        continue;
+                    }
+
+                    if (listener.data) {
+                        e.data = mixin({}, listener.data, e.data);
+                    }
+                    if (args.length == 2 && isPlainObject(args[1])) {
+                        e.data = e.data || {};
+                        mixin(e.data,args[1]);
+                    }
+
+                    listener.fn.apply(listener.ctx, args);
+                    if (listener.one) {
+                        listeners[i] = null;
+                        reCompact = true;
+                    }
                 }
-                return dimension === "width" ? cb.width : cb.height;
-            } else {
-                return this.each(function(idx, el) {
-                    var mb = {};
-                    var me = geom.marginExtents(el);
-                    if (dimension === "width") {
-                        mb.width = value;
-                        if (margin) {
-                            mb.width = mb.width - me.left - me.right
-                        }
-                    } else {
-                        mb.height = value;
-                        if (margin) {
-                            mb.height = mb.height - me.top - me.bottom;
+
+                if (reCompact) {
+                    self._hub[eventName] = compact(listeners);
+                }
+
+            });
+            return this;
+        },
+
+        queueEmit : function (event) {
+            const type = event.type || event;
+            let map = queues.get(this);
+            if (!map) {
+                map = new Map();
+                queues.set(this, map);
+            }
+            const oldTimeout = map.get(type);
+            map.delete(type);
+            window.clearTimeout(oldTimeout);
+            const timeout = window.setTimeout(() => {
+                if (map.size === 0) {
+                    map = null;
+                    queues.delete(this);
+                }
+                this.trigger(event);
+            }, 0);
+            map.set(type, timeout);
+        },
+
+        listened: function(event) {
+            var evtArr = ((this._hub || (this._events = {}))[event] || []);
+            return evtArr.length > 0;
+        },
+
+        off: function(events, callback) {
+            if (!events) {
+              this._hub = null;
+              return;
+            }
+            var _hub = this._hub || (this._hub = {});
+            if (isString(events)) {
+                events = events.split(/\s/)
+            }
+
+            events.forEach(function(event) {
+                var parsed = parse(event),
+                    name = parsed.name,
+                    ns = parsed.ns;
+
+                var evts = _hub[name];
+
+                if (evts) {
+                    var liveEvents = [];
+
+                    if (callback || ns) {
+                        for (var i = 0, len = evts.length; i < len; i++) {
+                            
+                            if (callback && evts[i].fn !== callback && evts[i].fn._ !== callback) {
+                                liveEvents.push(evts[i]);
+                                continue;
+                            } 
+
+                            if (ns && (!evts[i].ns || evts[i].ns.indexOf(ns)!=0)) {
+                                liveEvents.push(evts[i]);
+                                continue;
+                            }
                         }
                     }
-                    geom.size(el, mb);
-                })
 
-            }
-        };
-    })
+                    if (liveEvents.length) {
+                        _hub[name] = liveEvents;
+                    } else {
+                        delete _hub[name];
+                    }
 
-    $.fn.innerWidth = $.wraps.wrapper_value(geom.clientWidth, geom, geom.clientWidth);
+                }
+            });
 
-    $.fn.innerHeight = $.wraps.wrapper_value(geom.clientHeight, geom, geom.clientHeight);
+            return this;
+        },
 
-    return geom;
+        trigger  : function() {
+            return this.emit.apply(this,arguments);
+        },
+
+        queueTrigger : function (event) {
+            return this.queueEmit.apply(this,arguments);
+        }
+
+    });
+
+
+    return events.Emitter = Emitter;
+
 });
-define('skylark-domx-geom', ['skylark-domx-geom/main'], function (main) { return main; });
-
 define('skylark-domx-eventer/eventer',[
     "skylark-langx/skylark",
     "skylark-langx/langx",
@@ -17390,6 +16457,1364 @@ define('skylark-domx-eventer/main',[
     return eventer;
 });
 define('skylark-domx-eventer', ['skylark-domx-eventer/main'], function (main) { return main; });
+
+define('skylark-domx-geom/geom',[
+    "skylark-langx/skylark",
+    "skylark-langx/langx",
+    "skylark-domx-noder",
+    "skylark-domx-styler"
+], function(skylark, langx, noder, styler) {
+  'use strict'
+
+    var rootNodeRE = /^(?:body|html)$/i,
+        px = langx.toPixel,
+        offsetParent = noder.offsetParent,
+        cachedScrollbarWidth;
+
+    function scrollbarWidth() {
+        if (cachedScrollbarWidth !== undefined) {
+            return cachedScrollbarWidth;
+        }
+        var w1, w2,
+            div = noder.createFragment("<div style=" +
+                "'display:block;position:absolute;width:200px;height:200px;overflow:hidden;'>" +
+                "<div style='height:300px;width:auto;'></div></div>")[0],
+            innerDiv = div.childNodes[0];
+
+        noder.append(document.body, div);
+
+        w1 = innerDiv.offsetWidth;
+
+        styler.css(div, "overflow", "scroll");
+
+        w2 = innerDiv.offsetWidth;
+
+        if (w1 === w2) {
+            w2 = div[0].clientWidth;
+        }
+
+        noder.remove(div);
+
+        return (cachedScrollbarWidth = w1 - w2);
+    }
+
+
+    function hasScrollbar() {
+        return document.body.scrollHeight > (window.innerHeight || document.documentElement.clientHeight);
+    }
+
+    /*
+     * Get the widths of each border of the specified element.
+     * @param {HTMLElement} elm
+     */
+    function borderExtents(elm) {
+        if (noder.isWindow(elm)) {
+            return {
+                left : 0,
+                top : 0,
+                right : 0,
+                bottom : 0
+            }
+        }        var s = getComputedStyle(elm);
+        return {
+            left: px(s.borderLeftWidth, elm),
+            top: px(s.borderTopWidth, elm),
+            right: px(s.borderRightWidth, elm),
+            bottom: px(s.borderBottomWidth, elm)
+        }
+    }
+
+    //viewport coordinate
+    /*
+     * Get or set the viewport position of the specified element border box.
+     * @param {HTMLElement} elm
+     * @param {PlainObject} coords
+     */
+    function boundingPosition(elm, coords) {
+        if (coords === undefined) {
+            return rootNodeRE.test(elm.nodeName) ? { top: 0, left: 0 } : elm.getBoundingClientRect();
+        } else {
+            var // Get *real* offsetParent
+                parent = offsetParent(elm),
+                // Get correct offsets
+                parentOffset = boundingPosition(parent),
+                mex = marginExtents(elm),
+                pbex = borderExtents(parent);
+
+            relativePosition(elm, {
+                top: coords.top - parentOffset.top - mex.top - pbex.top,
+                left: coords.left - parentOffset.left - mex.left - pbex.left
+            });
+            return this;
+        }
+    }
+
+    /*
+     * Get or set the viewport rect of the specified element border box.
+     * @param {HTMLElement} elm
+     * @param {PlainObject} coords
+     */
+    function boundingRect(elm, coords) {
+        if (coords === undefined) {
+            if (elm == window || elm == document.documentElement || elm == document.body){
+                return {
+                    top : 0,
+                    left : 0,
+                    bottom : window.innerHeight,
+                    right : window.innerWidth,
+                    height : window.innerHeight,
+                    width : window.innerWidth
+                };
+            } else if (elm.getBoundingClientRect) {
+                return elm.getBoundingClientRect();
+            }
+        } else {
+            boundingPosition(elm, coords);
+            size(elm, coords);
+            return this;
+        }
+    }
+
+    /*
+     * Get or set the height of the specified element client box.
+     * @param {HTMLElement} elm
+     * @param {Number} value
+     */
+    function clientHeight(elm, value) {
+        if (value == undefined) {
+            return clientSize(elm).height;
+        } else {
+            return clientSize(elm, {
+                height: value
+            });
+        }
+    }
+
+    /*
+     * Get or set the size of the specified element client box.
+     * @param {HTMLElement} elm
+     * @param {PlainObject} dimension
+     */
+    function clientSize(elm, dimension) {
+        if (dimension == undefined) {
+            return {
+                width: elm.clientWidth,
+                height: elm.clientHeight
+            }
+        } else {
+            var isBorderBox = (styler.css(elm, "box-sizing") === "border-box"),
+                props = {
+                    width: dimension.width,
+                    height: dimension.height
+                };
+            if (!isBorderBox) {
+                var pex = paddingExtents(elm);
+
+                if (props.width !== undefined) {
+                    props.width = props.width - pex.left - pex.right;
+                }
+
+                if (props.height !== undefined) {
+                    props.height = props.height - pex.top - pex.bottom;
+                }
+            } else {
+                var bex = borderExtents(elm);
+
+                if (props.width !== undefined) {
+                    props.width = props.width + bex.left + bex.right;
+                }
+
+                if (props.height !== undefined) {
+                    props.height = props.height + bex.top + bex.bottom;
+                }
+
+            }
+            styler.css(elm, props);
+            return this;
+        }
+        return {
+            width: elm.clientWidth,
+            height: elm.clientHeight
+        };
+    }
+
+    /*
+     * Get or set the width of the specified element client box.
+     * @param {HTMLElement} elm
+     * @param {PlainObject} dimension
+     */
+    function clientWidth(elm, value) {
+        if (value == undefined) {
+            return clientSize(elm).width;
+        } else {
+            clientSize(elm, {
+                width: value
+            });
+            return this;
+        }
+    }
+
+    /*
+     * Get the rect of the specified element content box.
+     * @param {HTMLElement} elm
+     */
+    function contentRect(elm) {
+        var cs = clientSize(elm),
+            pex = paddingExtents(elm);
+
+
+        //// On Opera, offsetLeft includes the parent's border
+        //if(has("opera")){
+        //    pe.l += be.l;
+        //    pe.t += be.t;
+        //}
+        return {
+            left: pex.left,
+            top: pex.top,
+            width: cs.width - pex.left - pex.right,
+            height: cs.height - pex.top - pex.bottom
+        };
+    }
+
+    /*
+     * Get the document size.
+     * @param {HTMLDocument} doc
+     */
+    function getDocumentSize(doc) {
+        var documentElement = doc.documentElement,
+            body = doc.body,
+            max = Math.max,
+            scrollWidth = max(documentElement.scrollWidth, body.scrollWidth),
+            clientWidth = max(documentElement.clientWidth, body.clientWidth),
+            offsetWidth = max(documentElement.offsetWidth, body.offsetWidth),
+            scrollHeight = max(documentElement.scrollHeight, body.scrollHeight),
+            clientHeight = max(documentElement.clientHeight, body.clientHeight),
+            offsetHeight = max(documentElement.offsetHeight, body.offsetHeight);
+
+        return {
+            width: scrollWidth < offsetWidth ? clientWidth : scrollWidth,
+            height: scrollHeight < offsetHeight ? clientHeight : scrollHeight
+        };
+    }
+
+    /*
+     * Get the document size.
+     * @param {HTMLElement} elm
+     * @param {Number} value
+     */
+    function height(elm, value) {
+        if (value == undefined) {
+            return size(elm).height;
+        } else {
+            size(elm, {
+                height: value
+            });
+            return this;
+        }
+    }
+
+
+
+    function inview(elm, cushion) {
+        function calibrate(coords, cushion) {
+            var o = {};
+            cushion = +cushion || 0;
+            o.width = (o.right = coords.right + cushion) - (o.left = coords.left - cushion);
+            o.height = (o.bottom = coords.bottom + cushion) - (o.top = coords.top - cushion);
+            return o;
+        }
+
+        var r = calibrate(boundingRect(elm), cushion),
+            vsize = viewportSize();
+
+        return !!r && r.bottom >= 0 && r.right >= 0 && r.top <= vsize.height && r.left <= vsize.width;
+    }
+
+
+    /*
+     * Get the widths of each margin of the specified element.
+     * @param {HTMLElement} elm
+     */
+    function marginExtents(elm) {
+        if (noder.isWindow(elm)) {
+            return {
+                left : 0,
+                top : 0,
+                right : 0,
+                bottom : 0
+            }
+        }
+        var s = getComputedStyle(elm);
+        return {
+            left: px(s.marginLeft),
+            top: px(s.marginTop),
+            right: px(s.marginRight),
+            bottom: px(s.marginBottom),
+        }
+    }
+
+
+    function marginRect(elm) {
+        var obj = relativeRect(elm),
+            me = marginExtents(elm);
+
+        return {
+            left: obj.left,
+            top: obj.top,
+            width: obj.width + me.left + me.right,
+            height: obj.height + me.top + me.bottom
+        };
+    }
+
+
+    function marginSize(elm) {
+        var obj = size(elm),
+            me = marginExtents(elm);
+
+        return {
+            width: obj.width + me.left + me.right,
+            height: obj.height + me.top + me.bottom
+        };
+    }
+
+    /*
+     * Get the widths of each padding of the specified element.
+     * @param {HTMLElement} elm
+     */
+    function paddingExtents(elm) {
+        if (noder.isWindow(elm)) {
+            return {
+                left : 0,
+                top : 0,
+                right : 0,
+                bottom : 0
+            }
+        }
+        var s = getComputedStyle(elm);
+        return {
+            left: px(s.paddingLeft),
+            top: px(s.paddingTop),
+            right: px(s.paddingRight),
+            bottom: px(s.paddingBottom),
+        }
+    }
+
+    /*
+     * Get or set the document position of the specified element border box.
+     * @param {HTMLElement} elm
+     * @param {PlainObject} coords
+     */
+    //coordinate to the document
+    function pagePosition(elm, coords) {
+        if (coords === undefined) {
+            var obj = elm.getBoundingClientRect(),
+                w = elm.ownerDocument.defaultView;
+            return {
+                left: obj.left + w.pageXOffset,
+                top: obj.top + w.pageYOffset
+            }
+        } else {
+            var // Get *real* offsetParent
+                parent = offsetParent(elm),
+                // Get correct offsets
+                parentOffset = pagePosition(parent),
+                mex = marginExtents(elm),
+                pbex = borderExtents(parent);
+
+            relativePosition(elm, {
+                top: coords.top - parentOffset.top - mex.top - pbex.top,
+                left: coords.left - parentOffset.left - mex.left - pbex.left
+            });
+            return this;
+        }
+    }
+
+    /*
+     * Get or set the document rect of the specified element border box.
+     * @param {HTMLElement} elm
+     * @param {PlainObject} coords
+     */
+    function pageRect(elm, coords) {
+        if (coords === undefined) {
+            var obj = elm.getBoundingClientRect(),
+                w = elm.ownerDocument.defaultView;
+            return {
+                left: obj.left + w.pageXOffset,
+                top: obj.top + w.pageYOffset,
+                width: Math.round(obj.width),
+                height: Math.round(obj.height)
+            }
+        } else {
+            pagePosition(elm, coords);
+            size(elm, coords);
+            return this;
+        }
+    }
+
+    /*
+     * Get or set the position of the specified element border box , relative to parent element.
+     * @param {HTMLElement} elm
+     * @param {PlainObject} coords
+     */
+    // coordinate relative to it's parent
+    function relativePosition(elm, coords) {
+        if (coords == undefined) {
+            var // Get *real* offsetParent
+                parent = offsetParent(elm),
+                // Get correct offsets
+                offset = boundingPosition(elm),
+                parentOffset = boundingPosition(parent),
+                mex = marginExtents(elm),
+                pbex = borderExtents(parent);
+
+            // Subtract parent offsets and element margins
+            return {
+                top: offset.top - parentOffset.top - pbex.top - mex.top,
+                left: offset.left - parentOffset.left - pbex.left - mex.left
+            }
+        } else {
+            var // Get *real* offsetParent
+                parent = offsetParent(elm);
+
+            var props = {
+                top: coords.top,
+                left: coords.left
+            };
+
+            if (langx.isDefined(props.top)) {
+                props.top = props.top + (scrollTop(parent) || 0);
+            }
+
+            if (langx.isDefined(props.left)) {
+                props.left = props.left + (scrollLeft(parent) || 0);
+            } 
+
+
+            if (styler.css(elm, "position") == "static") {
+                props['position'] = "relative";
+            }
+
+
+            styler.css(elm, props);
+            return this;
+        }
+    }
+
+    /*
+     * Get or set the rect of the specified element border box , relatived to parent element.
+     * @param {HTMLElement} elm
+     * @param {PlainObject} coords
+     */
+    function relativeRect(elm, coords) {
+        if (coords === undefined) {
+            var // Get *real* offsetParent
+                parent = offsetParent(elm),
+                // Get correct offsets
+                offset = boundingRect(elm),
+                parentOffset = boundingPosition(parent),
+                mex = marginExtents(elm),
+                pbex = borderExtents(parent);
+
+            // Subtract parent offsets and element margins
+            return {
+                top: offset.top - parentOffset.top - pbex.top, // - mex.top,
+                left: offset.left - parentOffset.left - pbex.left, // - mex.left,
+                width: offset.width,
+                height: offset.height
+            }
+        } else {
+            relativePosition(elm, coords);
+            size(elm, coords);
+            return this;
+        }
+    }
+    /*
+     * Scroll the specified element into view.
+     * @param {HTMLElement} elm
+     * @param {} align
+     */
+    function scrollIntoView(elm, align) {
+        function getOffset(elm, rootElm) {
+            var x, y, parent = elm;
+
+            x = y = 0;
+            while (parent && parent != rootElm && parent.nodeType) {
+                x += parent.offsetLeft || 0;
+                y += parent.offsetTop || 0;
+                parent = parent.offsetParent;
+            }
+
+            return { x: x, y: y };
+        }
+
+        var parentElm = elm.parentNode;
+        var x, y, width, height, parentWidth, parentHeight;
+        var pos = getOffset(elm, parentElm);
+
+        x = pos.x;
+        y = pos.y;
+        width = elm.offsetWidth;
+        height = elm.offsetHeight;
+        parentWidth = parentElm.clientWidth;
+        parentHeight = parentElm.clientHeight;
+
+        if (align == "end") {
+            x -= parentWidth - width;
+            y -= parentHeight - height;
+        } else if (align == "center") {
+            x -= (parentWidth / 2) - (width / 2);
+            y -= (parentHeight / 2) - (height / 2);
+        }
+
+        parentElm.scrollLeft = x;
+        parentElm.scrollTop = y;
+
+        return this;
+    }
+    /*
+     * Get or set the current horizontal position of the scroll bar for the specified element.
+     * @param {HTMLElement} elm
+     * @param {Number} value
+     */
+    function scrollLeft(elm, value) {
+        if (elm.nodeType === 9) {
+            elm = elm.defaultView;
+        } else if (elm == document.body) {
+            elm = document.scrollingElement  || document.documentElement;
+        }
+        var hasScrollLeft = "scrollLeft" in elm;
+        if (value === undefined) {
+            return hasScrollLeft ? elm.scrollLeft : elm.pageXOffset
+        } else {
+            if (hasScrollLeft) {
+                elm.scrollLeft = value;
+            } else {
+                elm.scrollTo(value, elm.scrollY);
+            }
+            return this;
+        }
+    }
+    /*
+     * Get or the current vertical position of the scroll bar for the specified element.
+     * @param {HTMLElement} elm
+     * @param {Number} value
+     */
+    function scrollTop(elm, value) {
+        if (elm.nodeType === 9) {
+            elm = elm.defaultView;
+        } else if (elm == document.body) {
+            elm = document.scrollingElement  || document.documentElement;
+        }
+
+        var hasScrollTop = "scrollTop" in elm;
+
+        if (value === undefined) {
+            return hasScrollTop ? elm.scrollTop : elm.pageYOffset
+        } else {
+            if (hasScrollTop) {
+                elm.scrollTop = value;
+            } else {
+                elm.scrollTo(elm.scrollX, value);
+            }
+            return this;
+        }
+    }
+
+    function scrollBy(elm, x, y) {
+        elm.scrollLeft += x;
+        elm.scrollTop += y;
+    }
+
+
+    /*
+     * Get or set the size of the specified element border box.
+     * @param {HTMLElement} elm
+     * @param {PlainObject}dimension
+     */
+    function size(elm, dimension) {
+        if (dimension == undefined) {
+            if (langx.isWindow(elm)) {
+                return {
+                    width: elm.innerWidth,
+                    height: elm.innerHeight
+                }
+
+            } else if (langx.isDocument(elm)) {
+                return getDocumentSize(document);
+            } else {
+                return {
+                    width: elm.offsetWidth,
+                    height: elm.offsetHeight
+                }
+            }
+        } else {
+            var isBorderBox = (styler.css(elm, "box-sizing") === "border-box"),
+                props = {
+                    width: dimension.width,
+                    height: dimension.height
+                };
+            if (!isBorderBox) {
+                var pex = paddingExtents(elm),
+                    bex = borderExtents(elm);
+
+                if (props.width !== undefined && props.width !== "" && props.width !== null) {
+                    props.width = props.width - pex.left - pex.right - bex.left - bex.right;
+                }
+
+                if (props.height !== undefined && props.height !== "" && props.height !== null) {
+                    props.height = props.height - pex.top - pex.bottom - bex.top - bex.bottom;
+                }
+            }
+            styler.css(elm, props);
+            return this;
+        }
+    }
+
+
+    function viewportSize(win) {
+        win = win || window;
+
+        return boundingRect(win);
+    }
+
+    /*
+     * Get or set the size of the specified element border box.
+     * @param {HTMLElement} elm
+     * @param {Number} value
+     */
+    function width(elm, value) {
+        if (value == undefined) {
+            return size(elm).width;
+        } else {
+            size(elm, {
+                width: value
+            });
+            return this;
+        }
+    }
+
+    function testAxis(elm) {
+       
+        var top = elm.offsetTop;
+        var left = elm.offsetLeft;
+        var width = elm.offsetWidth;
+        var height = elm.offsetHeight;
+
+        while(elm.offsetParent) {
+            elm = elm.offsetParent;
+            top += elm.offsetTop;
+            left += elm.offsetLeft;
+        }
+
+        var result = {x: 0, y: 0};
+
+        //Over the top of the window
+        if(top < window.pageYOffset) {
+            result.y = top - window.pageYOffset;
+        }
+        //Bellow the window
+        else if((top + height) > (window.pageYOffset + window.innerHeight))
+        {
+            result.y = (top + height) - (window.pageYOffset + window.innerHeight);
+        }
+
+        //Left to the window
+        if(left < window.pageXOffset) {
+            result.x = left - window.pageXOffset;
+        }
+        //Right to the window
+        else if((left + width) > (window.pageXOffset + window.innerWidth))
+        {
+            result.x = (left + width) - (window.pageXOffset + window.innerWidth);
+        }
+
+        return result;
+    };    
+
+    function geom() {
+        return geom;
+    }
+
+    langx.mixin(geom, {
+        borderExtents: borderExtents,
+        //viewport coordinate
+        boundingPosition: boundingPosition,
+
+        boundingRect: boundingRect,
+
+        clientHeight: clientHeight,
+
+        clientSize: clientSize,
+
+        clientWidth: clientWidth,
+
+        contentRect: contentRect,
+
+        getDocumentSize: getDocumentSize,
+
+        hasScrollbar,
+
+        height: height,
+
+        inview,
+
+        marginExtents: marginExtents,
+
+        marginRect: marginRect,
+
+        marginSize: marginSize,
+
+        offsetParent: offsetParent,
+
+        paddingExtents: paddingExtents,
+
+        //coordinate to the document
+        pagePosition: pagePosition,
+
+        pageRect: pageRect,
+
+        // coordinate relative to it's parent
+        relativePosition: relativePosition,
+
+        relativeRect: relativeRect,
+
+        scrollbarWidth: scrollbarWidth,
+
+        scrollIntoView: scrollIntoView,
+
+        scrollLeft: scrollLeft,
+
+        scrollTop: scrollTop,
+
+        scrollBy,
+            
+        size: size,
+
+        testAxis,
+
+        viewportSize,
+
+        width: width
+    });
+
+
+
+    return skylark.attach("domx.geom", geom);
+});
+define('skylark-domx-geom/posit',[
+    "skylark-langx/langx",
+    "skylark-domx-noder",
+    "skylark-domx-styler",
+    "./geom"
+],function(langx,noder,styler,geom){
+  'use strict'
+
+    var max = Math.max,
+        abs = Math.abs,
+        rhorizontal = /left|center|right/,
+        rvertical = /top|center|bottom/,
+        roffset = /[\+\-]\d+(\.[\d]+)?%?/,
+        rposition = /^\w+/,
+        rpercent = /%$/;
+
+    function getOffsets( offsets, width, height ) {
+        return [
+            parseFloat( offsets[ 0 ] ) * ( rpercent.test( offsets[ 0 ] ) ? width / 100 : 1 ),
+            parseFloat( offsets[ 1 ] ) * ( rpercent.test( offsets[ 1 ] ) ? height / 100 : 1 )
+        ];
+    }
+
+    function parseCss( element, property ) {
+        return parseInt( styler.css( element, property ), 10 ) || 0;
+    }
+
+    function getDimensions( raw ) {
+        if ( raw.nodeType === 9 ) {
+            return {
+                size: size(raw),
+                offset: { top: 0, left: 0 }
+            };
+        }
+        if ( noder.isWindow( raw ) ) {
+            return {
+                size: geom.size(raw),
+                offset: { 
+                    top: geom.scrollTop(raw), 
+                    left: geom.scrollLeft(raw) 
+                }
+            };
+        }
+        if ( raw.preventDefault ) {
+            return {
+                size : {
+                    width: 0,
+                    height: 0
+                },
+                offset: { 
+                    top: raw.pageY, 
+                    left: raw.pageX 
+                }
+            };
+        }
+        return {
+            size: geom.size(raw),
+            offset: geom.pagePosition(raw)
+        };
+    }
+
+    function getScrollInfo( within ) {
+        var overflowX = within.isWindow || within.isDocument ? "" :
+                styler.css(within.element,"overflow-x" ),
+            overflowY = within.isWindow || within.isDocument ? "" :
+                styler.css(within.element,"overflow-y" ),
+            hasOverflowX = overflowX === "scroll" ||
+                ( overflowX === "auto" && within.width < geom.scrollWidth(within.element) ),
+            hasOverflowY = overflowY === "scroll" ||
+                ( overflowY === "auto" && within.height < geom.scrollHeight(within.element));
+        return {
+            width: hasOverflowY ? geom.scrollbarWidth() : 0,
+            height: hasOverflowX ? geom.scrollbarWidth() : 0
+        };
+    }
+
+    function getWithinInfo( element ) {
+        var withinElement = element || window,
+            isWindow = noder.isWindow( withinElement),
+            isDocument = !!withinElement && withinElement.nodeType === 9,
+            hasOffset = !isWindow && !isDocument,
+            msize = geom.marginSize(withinElement);
+        return {
+            element: withinElement,
+            isWindow: isWindow,
+            isDocument: isDocument,
+            offset: hasOffset ? geom.pagePosition(element) : { left: 0, top: 0 },
+            scrollLeft: geom.scrollLeft(withinElement),
+            scrollTop: geom.scrollTop(withinElement),
+            width: msize.width,
+            height: msize.height
+        };
+    }
+
+    function posit(elm,options ) {
+        // Make a copy, we don't want to modify arguments
+        options = langx.extend( {}, options );
+
+        var atOffset, targetWidth, targetHeight, targetOffset, basePosition, dimensions,
+            target = options.of,
+            within = getWithinInfo( options.within ),
+            scrollInfo = getScrollInfo( within ),
+            collision = ( options.collision || "flip" ).split( " " ),
+            offsets = {};
+
+        dimensions = getDimensions( target );
+        if ( target.preventDefault ) {
+
+            // Force left top to allow flipping
+            options.at = "left top";
+        }
+        targetWidth = dimensions.size.width;
+        targetHeight = dimensions.size.height;
+        targetOffset = dimensions.offset;
+
+        // Clone to reuse original targetOffset later
+        basePosition = langx.extend( {}, targetOffset );
+
+        // Force my and at to have valid horizontal and vertical positions
+        // if a value is missing or invalid, it will be converted to center
+        langx.each( [ "my", "at" ], function() {
+            var pos = ( options[ this ] || "" ).split( " " ),
+                horizontalOffset,
+                verticalOffset;
+
+            if ( pos.length === 1 ) {
+                pos = rhorizontal.test( pos[ 0 ] ) ?
+                    pos.concat( [ "center" ] ) :
+                    rvertical.test( pos[ 0 ] ) ?
+                        [ "center" ].concat( pos ) :
+                        [ "center", "center" ];
+            }
+            pos[ 0 ] = rhorizontal.test( pos[ 0 ] ) ? pos[ 0 ] : "center";
+            pos[ 1 ] = rvertical.test( pos[ 1 ] ) ? pos[ 1 ] : "center";
+
+            // Calculate offsets
+            horizontalOffset = roffset.exec( pos[ 0 ] );
+            verticalOffset = roffset.exec( pos[ 1 ] );
+            offsets[ this ] = [
+                horizontalOffset ? horizontalOffset[ 0 ] : 0,
+                verticalOffset ? verticalOffset[ 0 ] : 0
+            ];
+
+            // Reduce to just the positions without the offsets
+            options[ this ] = [
+                rposition.exec( pos[ 0 ] )[ 0 ],
+                rposition.exec( pos[ 1 ] )[ 0 ]
+            ];
+        } );
+
+        // Normalize collision option
+        if ( collision.length === 1 ) {
+            collision[ 1 ] = collision[ 0 ];
+        }
+
+        if ( options.at[ 0 ] === "right" ) {
+            basePosition.left += targetWidth;
+        } else if ( options.at[ 0 ] === "center" ) {
+            basePosition.left += targetWidth / 2;
+        }
+
+        if ( options.at[ 1 ] === "bottom" ) {
+            basePosition.top += targetHeight;
+        } else if ( options.at[ 1 ] === "center" ) {
+            basePosition.top += targetHeight / 2;
+        }
+
+        atOffset = getOffsets( offsets.at, targetWidth, targetHeight );
+        basePosition.left += atOffset[ 0 ];
+        basePosition.top += atOffset[ 1 ];
+
+        return ( function(elem) {
+            var collisionPosition, using,
+                msize = geom.marginSize(elem),
+                elemWidth = msize.width,
+                elemHeight = msize.height,
+                marginLeft = parseCss( elem, "marginLeft" ),
+                marginTop = parseCss( elem, "marginTop" ),
+                collisionWidth = elemWidth + marginLeft + parseCss( elem, "marginRight" ) +
+                    scrollInfo.width,
+                collisionHeight = elemHeight + marginTop + parseCss( elem, "marginBottom" ) +
+                    scrollInfo.height,
+                position = langx.extend( {}, basePosition ),
+                myOffset = getOffsets( offsets.my, msize.width, msize.height);
+
+            if ( options.my[ 0 ] === "right" ) {
+                position.left -= elemWidth;
+            } else if ( options.my[ 0 ] === "center" ) {
+                position.left -= elemWidth / 2;
+            }
+
+            if ( options.my[ 1 ] === "bottom" ) {
+                position.top -= elemHeight;
+            } else if ( options.my[ 1 ] === "center" ) {
+                position.top -= elemHeight / 2;
+            }
+
+            position.left += myOffset[ 0 ];
+            position.top += myOffset[ 1 ];
+
+            collisionPosition = {
+                marginLeft: marginLeft,
+                marginTop: marginTop
+            };
+
+            langx.each( [ "left", "top" ], function( i, dir ) {
+                if ( positions[ collision[ i ] ] ) {
+                    positions[ collision[ i ] ][ dir ]( position, {
+                        targetWidth: targetWidth,
+                        targetHeight: targetHeight,
+                        elemWidth: elemWidth,
+                        elemHeight: elemHeight,
+                        collisionPosition: collisionPosition,
+                        collisionWidth: collisionWidth,
+                        collisionHeight: collisionHeight,
+                        offset: [ atOffset[ 0 ] + myOffset[ 0 ], atOffset [ 1 ] + myOffset[ 1 ] ],
+                        my: options.my,
+                        at: options.at,
+                        within: within,
+                        elem: elem
+                    } );
+                }
+            } );
+
+            if ( options.using ) {
+
+                // Adds feedback as second argument to using callback, if present
+                using = function( props ) {
+                    var left = targetOffset.left - position.left,
+                        right = left + targetWidth - elemWidth,
+                        top = targetOffset.top - position.top,
+                        bottom = top + targetHeight - elemHeight,
+                        feedback = {
+                            target: {
+                                element: target,
+                                left: targetOffset.left,
+                                top: targetOffset.top,
+                                width: targetWidth,
+                                height: targetHeight
+                            },
+                            element: {
+                                element: elem,
+                                left: position.left,
+                                top: position.top,
+                                width: elemWidth,
+                                height: elemHeight
+                            },
+                            horizontal: right < 0 ? "left" : left > 0 ? "right" : "center",
+                            vertical: bottom < 0 ? "top" : top > 0 ? "bottom" : "middle"
+                        };
+                    if ( targetWidth < elemWidth && abs( left + right ) < targetWidth ) {
+                        feedback.horizontal = "center";
+                    }
+                    if ( targetHeight < elemHeight && abs( top + bottom ) < targetHeight ) {
+                        feedback.vertical = "middle";
+                    }
+                    if ( max( abs( left ), abs( right ) ) > max( abs( top ), abs( bottom ) ) ) {
+                        feedback.important = "horizontal";
+                    } else {
+                        feedback.important = "vertical";
+                    }
+                    options.using.call( this, props, feedback );
+                };
+            }
+
+            geom.pagePosition(elem, langx.extend( position, { using: using } ));
+        })(elm);
+    }
+
+    var positions = {
+        fit: {
+            left: function( position, data ) {
+                var within = data.within,
+                    withinOffset = within.isWindow ? within.scrollLeft : within.offset.left,
+                    outerWidth = within.width,
+                    collisionPosLeft = position.left - data.collisionPosition.marginLeft,
+                    overLeft = withinOffset - collisionPosLeft,
+                    overRight = collisionPosLeft + data.collisionWidth - outerWidth - withinOffset,
+                    newOverRight;
+
+                // Element is wider than within
+                if ( data.collisionWidth > outerWidth ) {
+
+                    // Element is initially over the left side of within
+                    if ( overLeft > 0 && overRight <= 0 ) {
+                        newOverRight = position.left + overLeft + data.collisionWidth - outerWidth -
+                            withinOffset;
+                        position.left += overLeft - newOverRight;
+
+                    // Element is initially over right side of within
+                    } else if ( overRight > 0 && overLeft <= 0 ) {
+                        position.left = withinOffset;
+
+                    // Element is initially over both left and right sides of within
+                    } else {
+                        if ( overLeft > overRight ) {
+                            position.left = withinOffset + outerWidth - data.collisionWidth;
+                        } else {
+                            position.left = withinOffset;
+                        }
+                    }
+
+                // Too far left -> align with left edge
+                } else if ( overLeft > 0 ) {
+                    position.left += overLeft;
+
+                // Too far right -> align with right edge
+                } else if ( overRight > 0 ) {
+                    position.left -= overRight;
+
+                // Adjust based on position and margin
+                } else {
+                    position.left = max( position.left - collisionPosLeft, position.left );
+                }
+            },
+            top: function( position, data ) {
+                var within = data.within,
+                    withinOffset = within.isWindow ? within.scrollTop : within.offset.top,
+                    outerHeight = data.within.height,
+                    collisionPosTop = position.top - data.collisionPosition.marginTop,
+                    overTop = withinOffset - collisionPosTop,
+                    overBottom = collisionPosTop + data.collisionHeight - outerHeight - withinOffset,
+                    newOverBottom;
+
+                // Element is taller than within
+                if ( data.collisionHeight > outerHeight ) {
+
+                    // Element is initially over the top of within
+                    if ( overTop > 0 && overBottom <= 0 ) {
+                        newOverBottom = position.top + overTop + data.collisionHeight - outerHeight -
+                            withinOffset;
+                        position.top += overTop - newOverBottom;
+
+                    // Element is initially over bottom of within
+                    } else if ( overBottom > 0 && overTop <= 0 ) {
+                        position.top = withinOffset;
+
+                    // Element is initially over both top and bottom of within
+                    } else {
+                        if ( overTop > overBottom ) {
+                            position.top = withinOffset + outerHeight - data.collisionHeight;
+                        } else {
+                            position.top = withinOffset;
+                        }
+                    }
+
+                // Too far up -> align with top
+                } else if ( overTop > 0 ) {
+                    position.top += overTop;
+
+                // Too far down -> align with bottom edge
+                } else if ( overBottom > 0 ) {
+                    position.top -= overBottom;
+
+                // Adjust based on position and margin
+                } else {
+                    position.top = max( position.top - collisionPosTop, position.top );
+                }
+            }
+        },
+        flip: {
+            left: function( position, data ) {
+                var within = data.within,
+                    withinOffset = within.offset.left + within.scrollLeft,
+                    outerWidth = within.width,
+                    offsetLeft = within.isWindow ? within.scrollLeft : within.offset.left,
+                    collisionPosLeft = position.left - data.collisionPosition.marginLeft,
+                    overLeft = collisionPosLeft - offsetLeft,
+                    overRight = collisionPosLeft + data.collisionWidth - outerWidth - offsetLeft,
+                    myOffset = data.my[ 0 ] === "left" ?
+                        -data.elemWidth :
+                        data.my[ 0 ] === "right" ?
+                            data.elemWidth :
+                            0,
+                    atOffset = data.at[ 0 ] === "left" ?
+                        data.targetWidth :
+                        data.at[ 0 ] === "right" ?
+                            -data.targetWidth :
+                            0,
+                    offset = -2 * data.offset[ 0 ],
+                    newOverRight,
+                    newOverLeft;
+
+                if ( overLeft < 0 ) {
+                    newOverRight = position.left + myOffset + atOffset + offset + data.collisionWidth -
+                        outerWidth - withinOffset;
+                    if ( newOverRight < 0 || newOverRight < abs( overLeft ) ) {
+                        position.left += myOffset + atOffset + offset;
+                    }
+                } else if ( overRight > 0 ) {
+                    newOverLeft = position.left - data.collisionPosition.marginLeft + myOffset +
+                        atOffset + offset - offsetLeft;
+                    if ( newOverLeft > 0 || abs( newOverLeft ) < overRight ) {
+                        position.left += myOffset + atOffset + offset;
+                    }
+                }
+            },
+            top: function( position, data ) {
+                var within = data.within,
+                    withinOffset = within.offset.top + within.scrollTop,
+                    outerHeight = within.height,
+                    offsetTop = within.isWindow ? within.scrollTop : within.offset.top,
+                    collisionPosTop = position.top - data.collisionPosition.marginTop,
+                    overTop = collisionPosTop - offsetTop,
+                    overBottom = collisionPosTop + data.collisionHeight - outerHeight - offsetTop,
+                    top = data.my[ 1 ] === "top",
+                    myOffset = top ?
+                        -data.elemHeight :
+                        data.my[ 1 ] === "bottom" ?
+                            data.elemHeight :
+                            0,
+                    atOffset = data.at[ 1 ] === "top" ?
+                        data.targetHeight :
+                        data.at[ 1 ] === "bottom" ?
+                            -data.targetHeight :
+                            0,
+                    offset = -2 * data.offset[ 1 ],
+                    newOverTop,
+                    newOverBottom;
+                if ( overTop < 0 ) {
+                    newOverBottom = position.top + myOffset + atOffset + offset + data.collisionHeight -
+                        outerHeight - withinOffset;
+                    if ( newOverBottom < 0 || newOverBottom < abs( overTop ) ) {
+                        position.top += myOffset + atOffset + offset;
+                    }
+                } else if ( overBottom > 0 ) {
+                    newOverTop = position.top - data.collisionPosition.marginTop + myOffset + atOffset +
+                        offset - offsetTop;
+                    if ( newOverTop > 0 || abs( newOverTop ) < overBottom ) {
+                        position.top += myOffset + atOffset + offset;
+                    }
+                }
+            }
+        },
+        flipfit: {
+            left: function() {
+                positions.flip.left.apply( this, arguments );
+                positions.fit.left.apply( this, arguments );
+            },
+            top: function() {
+                positions.flip.top.apply( this, arguments );
+                positions.fit.top.apply( this, arguments );
+            }
+        }
+    };
+
+    return geom.posit = posit;
+});
+define('skylark-domx-geom/scrollToTop',[
+    "skylark-langx/langx",
+    "skylark-domx-styler",
+    "./geom"
+],function(langx,styler,geom) {
+    /*   
+     * Set the vertical position of the scroll bar for an element.
+     * @param {Object} elm  
+     * @param {Number or String} pos
+     * @param {Number or String} speed
+     * @param {Function} callback
+     */
+    function scrollToTop(elm, pos, speed, callback) {
+        var scrollFrom = parseInt(elm.scrollTop),
+            i = 0,
+            runEvery = 5, // run every 5ms
+            freq = speed * 1000 / runEvery,
+            scrollTo = parseInt(pos);
+
+        var interval = setInterval(function() {
+            i++;
+
+            if (i <= freq) elm.scrollTop = (scrollTo - scrollFrom) / freq * i + scrollFrom;
+
+            if (i >= freq + 1) {
+                clearInterval(interval);
+                if (callback) langx.debounce(callback, 1000)();
+            }
+        }, runEvery);
+
+        return this;
+    }
+
+    return geom.scrollToTop = scrollToTop;
+});
+define('skylark-domx-geom/main',[
+    "skylark-langx/langx",
+    "./geom",
+    "skylark-domx-velm",
+    "skylark-domx-query",
+    "./posit",
+    "./scrollToTop"
+],function(langx,geom,velm,$){
+   // from ./geom
+    velm.delegate([
+        "borderExtents",
+        "boundingPosition",
+        "boundingRect",
+        "clientHeight",
+        "clientSize",
+        "clientWidth",
+        "contentRect",
+        "height",
+        "marginExtents",
+        "marginRect",
+        "marginSize",
+        "offsetParent",
+        "paddingExtents",
+        "pagePosition",
+        "pageRect",
+        "relativePosition",
+        "relativeRect",
+        "scrollIntoView",
+        "scrollLeft",
+        "scrollTop",
+        "pageSize",
+        "width"
+    ], geom,{
+        "pageSize" : "size"
+    });
+
+    $.fn.offset = $.wraps.wrapper_value(geom.pagePosition, geom, geom.pagePosition);
+
+    $.fn.scrollTop = $.wraps.wrapper_value(geom.scrollTop, geom);
+
+    $.fn.scrollLeft = $.wraps.wrapper_value(geom.scrollLeft, geom);
+
+    $.fn.position =  function(options) {
+        if (!this.length) {
+            return this;
+        }
+
+        if (options) {
+            if (options.of && options.of.length) {
+                options = langx.clone(options);
+                options.of = options.of[0];
+            }
+            return this.each( function() {
+                geom.posit(this,options);
+            });
+        } else {
+            var elem = this[0];
+
+            return geom.relativePosition(elem);
+
+        }             
+    };
+
+    $.fn.offsetParent = $.wraps.wrapper_map(geom.offsetParent, geom);
+
+
+    $.fn.pageSize = $.wraps.wrapper_value(geom.size, geom);
+
+    $.fn.width = $.wraps.wrapper_value(geom.width, geom, geom.width);
+
+    $.fn.height = $.wraps.wrapper_value(geom.height, geom, geom.height);
+
+    $.fn.clientSize = $.wraps.wrapper_value(geom.clientSize, geom.clientSize);
+    
+    ['width', 'height'].forEach(function(dimension) {
+        var offset, Dimension = dimension.replace(/./, function(m) {
+            return m[0].toUpperCase()
+        });
+
+        $.fn['outer' + Dimension] = function(margin, value) {
+            if (arguments.length) {
+                if (typeof margin !== 'boolean') {
+                    value = margin;
+                    margin = false;
+                }
+            } else {
+                margin = false;
+                value = undefined;
+            }
+
+            if (value === undefined) {
+                var el = this[0];
+                if (!el) {
+                    return undefined;
+                }
+                var cb = geom.size(el);
+                if (margin) {
+                    var me = geom.marginExtents(el);
+                    cb.width = cb.width + me.left + me.right;
+                    cb.height = cb.height + me.top + me.bottom;
+                }
+                return dimension === "width" ? cb.width : cb.height;
+            } else {
+                return this.each(function(idx, el) {
+                    var mb = {};
+                    var me = geom.marginExtents(el);
+                    if (dimension === "width") {
+                        mb.width = value;
+                        if (margin) {
+                            mb.width = mb.width - me.left - me.right
+                        }
+                    } else {
+                        mb.height = value;
+                        if (margin) {
+                            mb.height = mb.height - me.top - me.bottom;
+                        }
+                    }
+                    geom.size(el, mb);
+                })
+
+            }
+        };
+    })
+
+    $.fn.innerWidth = $.wraps.wrapper_value(geom.clientWidth, geom, geom.clientWidth);
+
+    $.fn.innerHeight = $.wraps.wrapper_value(geom.clientHeight, geom, geom.clientHeight);
+
+    return geom;
+});
+define('skylark-domx-geom', ['skylark-domx-geom/main'], function (main) { return main; });
 
 define('skylark-domx-fx/fx',[
     "skylark-langx/skylark",
@@ -19182,6 +19607,1162 @@ define('skylark-domx-fx/main',[
 });
 define('skylark-domx-fx', ['skylark-domx-fx/main'], function (main) { return main; });
 
+define('skylark-domx-animates/animate',[
+    "skylark-langx/langx",
+    "skylark-domx-styler",
+    "skylark-domx-eventer",
+    "./animates"
+], function(langx, styler, eventer,animates) {
+
+
+    function animate(elm,className) {
+        if (animates.animateBaseClass) {
+          className = animates.animateBaseClass + " " + className;
+        }
+        styler.addClass(elm,className);
+        eventer.one(elm,animates.animationEnd, function() {
+            styler.removeClass(elm,className);
+        });
+        return this;
+    }
+    
+    return animates.animate = animate;
+});
+define('skylark-domx-animates/main',[
+	"./animates",
+    "./animation",
+    "./animate"
+],function(animates){
+
+	return animates;
+});
+define('skylark-domx-animates', ['skylark-domx-animates/main'], function (main) { return main; });
+
+define('skylark-domx/animates',[
+    "skylark-domx-animates"
+], function( animates) {
+    return animates;
+});
+define('skylark-domx/browser',[
+    "skylark-domx-browser"
+], function(browser) {
+    "use strict";
+
+    return browser;
+});
+
+define('skylark-domx-css/css',[
+    "skylark-langx/skylark",
+    "skylark-langx/langx",
+    "skylark-domx-noder"
+], function(skylark, langx, noder) {
+    "use strict";
+
+    var head = document.getElementsByTagName("head")[0],
+        count = 0,
+        sheetsByUrl = {},
+        sheetsById = {},
+        defaultSheetId = _createStyleSheet(),
+        defaultSheet = sheetsById[defaultSheetId],
+        rulesPropName = ("cssRules" in defaultSheet) ? "cssRules" : "rules",
+        insertRuleFunc,
+        deleteRuleFunc = defaultSheet.deleteRule || defaultSheet.removeRule;
+
+    if (defaultSheet.insertRule) {
+        var _insertRule = defaultSheet.insertRule;
+        insertRuleFunc = function(selector, css, index) {
+            _insertRule.call(this, selector + "{" + css + "}", index);
+        };
+    } else {
+        insertRuleFunc = defaultSheet.addRule;
+    }
+
+    function normalizeSelector(selectorText) {
+        var selector = [],
+            last, len;
+        last = defaultSheet[rulesPropName].length;
+        insertRuleFunc.call(defaultSheet, selectorText, ';');
+        len = defaultSheet[rulesPropName].length;
+        for (var i = len - 1; i >= last; i--) {
+            selector.push(_sheet[_rules][i].selectorText);
+            deleteRuleFunc.call(defaultSheet, i);
+        }
+        return selector.reverse().join(', ');
+    }
+
+    /*
+     * create a stylesheet element.
+     * @param {Boolean} external
+     * @param {Object} options
+     * @param {String} [options.media = null]
+     */
+    function _createStyleSheet(external,options ) {
+        var node,
+            props = {
+                type : "text/css"
+            },
+            id = (count++);
+
+        options = options || {};
+        if (options.media) {
+            props.media = options.media;
+        }
+
+        if (external) {
+            node = noder.create("link",langx.mixin(props,{
+                rel  : "stylesheet",
+                async : false
+            }));
+        } else {
+            node = noder.createElement("style",props);
+        }
+
+        noder.append(head,node);
+        sheetsById[id] = {
+            id : id,
+            node :node
+        };
+
+        return id;
+    }
+
+    function createStyleSheet(css,options) {
+        if (!options) {
+            options = {};
+        }
+        var sheetId = _createStyleSheet(false,options);
+        if (css) {
+            addSheetRules(sheetId,css);
+        }
+
+        return sheetId;
+    }
+
+    function loadStyleSheet(url, options,loadedCallback, errorCallback) {
+        if (langx.isFunction(options)) {
+            errorCallback = loadedCallback;
+            loadedCallback = options;
+            options = {};
+        }
+        var sheet = sheetsByUrl[url];
+        if (!sheet) {
+            var sheetId = _createStyleSheet(true,options);
+
+            sheet = sheetsByUrl[url] = sheetsById[sheetId];
+            langx.mixin(sheet,{
+                state: 0, //0:unload,1:loaded,-1:loaderror
+                url : url,
+                deferred : new langx.Deferred()
+            });
+
+            var node = sheet.node;
+
+            startTime = new Date().getTime();
+
+            node.onload = function() {
+                sheet.state = 1;
+                sheet.deferred.resolve(sheet.id);
+            },
+            node.onerror = function(e) {
+                sheet.state = -1;
+                sheet.deferred.reject(e);
+            };
+
+            node.href = sheet.url;
+        }
+        if (loadedCallback || errorCallback) {
+            sheet.deferred.promise.then(loadedCallback,errorCallback);
+        }
+        return sheet.id;
+    }
+
+    function deleteSheetRule(sheetId, rule) {
+        var sheet = sheetsById[sheetId];
+        if (langx.isNumber(rule)) {
+            deleteRuleFunc.call(sheet, rule);
+        } else {
+            langx.each(sheet[rulesPropName], function(i, _rule) {
+                if (rule === _rule) {
+                    deleteRuleFunc.call(sheet, i);
+                    return false;
+                }
+            });
+        }
+        return this;
+    }
+
+    function deleteRule(rule) {
+        deleteSheetRule(defaultSheetId, rule);
+        return this;
+    }
+
+    function removeStyleSheet(sheetId) {
+        if (sheetId === defaultSheetId) {
+            throw new Error("The default stylesheet can not be deleted");
+        }
+        var sheet = sheetsById[sheetId];
+        delete sheetsById[sheetId];
+
+        noder.remove(sheet.node);
+        return this;
+    }
+
+    /*
+     * insert a rule to the default stylesheet.
+     * @param {String} selector
+     * @param {String} css
+     * @param {Number} index 
+     */
+    function insertRule(selector, css, index) {
+        return this.insertSheetRule(defaultSheetId, selector, css, index);
+    }
+
+    /*
+     * Add rules to the default stylesheet.
+     * @param {Object} rules
+     */
+    function addRules(rules) {
+        return this.addRules(defaultSheetId,rules);
+    }
+
+    /*
+     * insert a rule to the stylesheet specified by sheetId.
+     * @param {Number} sheetId  
+     * @param {String} selector
+     * @param {String} css
+     * @param {Number} index 
+     */
+    function insertSheetRule(sheetId, selector, css, index) {
+        if (!selector || !css) {
+            return -1;
+        }
+
+        var sheet = sheetsById[sheetId];
+        index = index || sheet[rulesPropName].length;
+
+        return insertRuleFunc.call(sheet, selector, css, index);
+    }
+
+    /*
+     * Add  rules to stylesheet.
+     * @param {Number} sheetId  
+     * @param {Object|String} rules
+     * @return this
+     * @example insertSheetRules(sheetId,{
+     * 
+     * });
+     */
+    function addSheetRules(sheetId,rules) {
+        var sheet = sheetsById[sheetId],
+            css;
+        if (langx.isString(rules)) {
+            css = rules;
+        } else {
+            css = toString(rules);
+        }
+
+        noder.append(sheet.node,noder.createTextNode(css));
+        
+        return this;
+    }
+
+    function isAtRule(str) {
+        return str.startsWith("@");
+    }
+
+    function toString(json){
+        var adjust = function(parentName,name,depth) {
+            if (parentName) {
+                if (isAtRule(parentName)) {
+                    depth += 1;
+                } else {
+                    name =  parentName + " " + name;
+                }                
+            }
+            return {
+                name : name,
+                depth : depth
+            }
+        };
+
+        var strNode = function (name, values, depth) {
+            var str = "",
+                atFlg = isAtRule(name);
+
+
+            if (isAtRule(name)) {
+                // at rule
+                if (langx.isString(values)) {
+                    // an at rule without block
+                    // ex: (1) @charset 'utf8';
+                    str = css.SPACE.repeat(depth) + name.trim() + " \"" + values.trim() + " \";\n";
+                } else {
+                    // an at rule with block, ex :
+                    //  @media 'screen' {
+                    //  }
+                    str += css.SPACE.repeat(depth) + name.trim() + " {\n";
+                    str += strNode("",values,depth+1);
+                    str += css.SPACE.repeat(depth) + " }\n";
+                }
+            } else {
+                // a selector or a property
+                if (langx.isString(values)) {
+                    // a css property 
+                    // ex : (1) font-color : red;
+                    str = css.SPACE.repeat(depth) + name.trim() ;
+                    if (atFlg) {
+                        str = str +  " \"" + values.trim() + " \";\n";
+                    } else {
+                        str = str + ': ' + values.trim() + ";\n";
+                    }
+
+                } else {
+                    // a selector rule 
+                    // ex : (1) .class1 : {
+                    //            font-color : red;
+                    //          }
+                    if (langx.isArray(values)) {
+                        // array for ordering
+                        for (var n =0; n<values.length; n ++) {
+                           str +=  strNode(name,values[n],depth);
+                        }
+                    } else {
+                        // plain object
+
+                        if (name) {
+                            str += css.SPACE.repeat(depth) + name.trim() + " {\n";
+
+                            for (var n in values) {
+                                var value =values[n];
+                                if (langx.isString(value)) {
+                                    // css property
+                                    str += strNode(n,value,depth+1)
+                                }
+                            }
+
+                            str += css.SPACE.repeat(depth) + "}\n";
+                        }
+
+                        for (var n in values) {
+                            var value =values[n];
+                            if (!langx.isString(value)) {
+                                var adjusted = adjust(name,n,depth);
+                                str +=  strNode(adjusted.name,value,adjusted.depth);
+                            } 
+                        }
+
+                    }
+                }
+            }   
+
+            return str;
+        };
+
+
+        return strNode("",json,0);
+    }
+ 
+
+    function css() {
+        return css;
+    }
+
+    langx.mixin(css, {
+        SPACE : "\t",
+
+        addRules : addRules,
+
+        addSheetRules : addSheetRules,
+
+        createStyleSheet: createStyleSheet,
+
+        deleteSheetRule : deleteSheetRule,
+
+        deleteRule : deleteRule,
+
+        insertRule : insertRule,
+
+        insertSheetRule : insertSheetRule,
+
+        loadStyleSheet : loadStyleSheet,
+
+        removeStyleSheet : removeStyleSheet,
+
+        toString : toString
+    });
+
+    return skylark.attach("domx.css", css);
+});
+
+define('skylark-domx-css/main',[
+	"./css"
+],function(css){
+	return css;
+});
+define('skylark-domx-css', ['skylark-domx-css/main'], function (main) { return main; });
+
+define('skylark-domx/css',[
+    "skylark-domx-css"
+], function( css) {
+    "use strict";
+
+     return css;
+});
+
+define('skylark-domx/data',[
+    "skylark-domx-data"
+], function( data) {
+ 
+    return data;
+});
+define('skylark-domx/eventer',[
+    "skylark-domx-eventer"
+], function( eventer) {
+ 
+    return eventer;
+});
+define('skylark-domx/finder',[
+    "skylark-domx-finder"
+], function( finder) {
+
+    return finder;
+});
+define('skylark-domx/fx',[
+    "skylark-domx-fx"
+], function( fx) {
+    return fx;
+});
+define('skylark-domx/geom',[
+    "skylark-domx-geom"
+], function( geom) {
+
+    return geom;
+});
+define('skylark-domx-iframes/iframes',[
+	"skylark-langx-ns"
+],function(skylark){
+	return skylark.attach("domx.iframes");
+});
+define('skylark-domx-iframes/create',[
+  "skylark-domx-noder",
+  "./iframes"
+],function(noder,iframes){
+  'use strict';
+
+  function create(options,parentElm) {
+  	  options = options || {
+  	  };
+
+  	  let props = {},
+  	  	  attrs = {};
+
+  	  if (options.id) {
+  	  	props.id = options.id;
+  	  };
+
+  	  if (options.url) {
+  	  	props.src = options.url;
+  	  };
+
+  	  if (options.style) {
+  	  	props.style = options.style;
+  	  }
+
+  	  if (options.onload) {
+  	  	props.onload = options.onload;
+  	  }
+
+  	  if (options.onerror) {
+  	  	props.onload = options.onerror;
+  	  }
+
+  	  if (options.className) {
+  	  	props.className = options.className;
+  	  }
+
+  	  if (options.sandbox) {
+  	  	attrs.sandbox = options.sandbox;
+  	  }
+
+  	  if (options.frameBorder) {
+  	  	attrs.frameBorder = options.frameBorder;  	  	
+  	  }
+
+  	  if (options.name) {
+  	  	attrs.name = options.name;
+  	  }
+
+  	  /*
+      // Basic mode
+      // This adds the runner iframe to the page. It's only run once.
+      //if (!$live.find('iframe').length) {
+        iframe = noder.create("iframe",{
+          ///iframe.src = jsbin.runner;
+          src : this.options.runnerUrl
+        },{
+          "class" : "stretch",
+          "sandbox", "allow-modals allow-forms allow-pointer-lock allow-popups allow-same-origin allow-scripts",
+          "frameBorder": '0',
+          "name", "<proxy>",
+        },this._elm);
+
+        try {
+          ///iframe.contentWindow.name = '/' + jsbin.state.code + '/' + jsbin.state.revision;
+          iframe.contentWindow.name  = this.options.runnerName;
+        } catch (e) {
+          // ^- this shouldn't really fail, but if we're honest, it's a fucking mystery as to why it even works.
+          // problem is: if this throws (because iframe.contentWindow is undefined), then the execution exits
+          // and `var renderLivePreview` is set to undefined. The knock on effect is that the calls to renderLivePreview
+          // then fail, and jsbin doesn't boot up. Tears all round, so we catch.
+        }
+      //}
+
+      iframe.onload = () => {
+        if (window.postMessage) {
+          // setup postMessage listening to the runner
+          $window.on('message', (event) => {
+            this.handleMessage(event.originalEvent)
+          });
+          this.setup(iframe);
+          this._inited.resolve();
+        }
+      };
+
+      iframe.onerror = err => {
+        this._inited.reject(err);
+      };
+
+      */
+
+      let iframe = noder.create("iframe",props,attrs,parentElm);
+
+      if (options.contentWindowName) {
+      	iframe.contentWindow.name = options.contentWindowName;
+      }
+
+      return iframe;
+  }
+
+  return iframes.create = create;
+});
+define('skylark-domx-iframes/hook-sizing',[
+  "skylark-domx-eventer",
+  "./iframes"
+],function(eventer,iframes){
+  'use strict';
+
+  function hookSizing(iframe) {
+    var onmessage = function (event) {
+      if (!event) { event = window.event; }
+      ///TODO : how check message source
+      // * 1 to coerse to number, and + 2 to compensate for border
+      iframe.style.height = (event.data.height * 1 + 2) + 'px';
+    };
+
+    eventer.on(window,'message', onmessage);
+  }
+
+  return iframes.hookSizing = hookSizing;
+
+});
+define('skylark-domx-iframes/load-real',[
+  "skylark-domx-noder",
+  "skylark-domx-data",
+  "./iframes",
+  "./hook-sizing"
+],function(noder,datax,iframes,hookSizing){
+
+  function loadReal(iframe,options) {
+    options = options || {};
+    var clone = noder.clone(iframe);
+    var url = options.url;
+    if (!url) {
+      url = datax.attr(clone,options.urlAttrName || 'data-url');
+    }
+    url = url.split('&')[0];
+    datax.prop(clone,"src",url);
+    datax.prop(clone,"_src",url); // support for google slide embed
+    noder.replace(clone,ifame);
+    ///hookSizing(clone);
+  }
+
+  return iframes.loadReal = loadReal;  
+});
+define('skylark-domx-iframes/lazy-load',[
+	"skylark-domx-eventer",
+	"skylark-domx-data",
+	"skylark-domx-geom",
+	"./iframes",
+	"./load-real"
+],function(eventer,datax,geom,iframes,loadReal){
+	var pending;
+
+
+  	function check() {
+	    var i = 0;
+	    var todo = [];
+	    for (i = 0; i < pending.length; i++) {
+	      if (geom.inview(pending[i], 400)) {
+	        todo.unshift({ iframe: pending[i], i: i });
+	      }
+	    }
+
+	    for (i = todo.length -1 ; i >=0 ; i--) {
+	      pending.splice(todo[i].i, 1);
+	      loadReal(todo[i].iframe);
+	    }
+  	}
+
+	function init() {
+		if (pending) {
+			return
+		}
+
+		pending = [];
+
+		eventer.on(window,"scroll",function(){
+			check();
+		});
+	}
+
+	function lazyLoad(iframe,options) {
+		init();
+
+		options = options || {};
+	
+      	///iframe.setAttribute('data-url', url);
+      	///iframe.src = 'https://jsbin.com/embed-holding';
+      	if (options.url) {
+      		datax.attr(iframe,(options.urlAttrName || "data-url"),options.url)
+      	}
+
+      	if (options.holdingUrl) {
+      		datax.prop(iframe,"src",options.holdingUrl)      		
+      	}
+
+		pending.push(iframe);
+	}
+
+	return iframes.lazyLoad = lazyLoad
+});
+define('skylark-langx-urls/urls',[
+  "skylark-langx-ns"
+],function(skylark){
+
+
+    return skylark.attach("langx.urls",{
+
+    });
+});
+
+
+
+define('skylark-langx-urls/get-query',[
+    './urls'
+], function (urls) {
+    'use strict';
+	function getQuery(querystring) {
+		var query = {};
+
+		var pairs = querystring.split('&'),
+		    length = pairs.length,
+		    keyval = [],
+		    i = 0;
+
+		for (; i < length; i++) {
+		  keyval = pairs[i].split('=', 2);
+		  try {
+		    keyval[0] = decodeURIComponent(keyval[0]); // key
+		    keyval[1] = decodeURIComponent(keyval[1]); // value
+		  } catch (e) {}
+
+		  if (query[keyval[0]] === undefined) {
+		    query[keyval[0]] = keyval[1];
+		  } else {
+		    query[keyval[0]] += ',' + keyval[1];
+		  }
+		}
+
+		return query;
+	}
+
+	return urls.getQuery = getQuery;
+
+});
+define('skylark-domx-iframes/replace',[
+  "skylark-langx-urls/get-query",
+  "skylark-domx-noder",
+  "skylark-domx-geom",
+  "skylark-domx-styler",
+  "./iframes",
+  "./create",
+  "./load-real",
+  "./lazy-load"
+],function(getQuery,noder,geom,styler,iframes,create,loadReal,lazyLoad){
+  'use strict';
+  
+  function replace(link,options) {
+    options = options || {};
+
+    /*
+    var iframe = noder.createElement('iframe',{
+      "className" : link.className, // inherit all the classes from the link
+      "id" : link.id, // also inherit, giving more style control to the user
+      "style" : { "border" : '1px solid #aaa'}
+    });
+    */
+
+    var ifarme =create({
+      "className" : link.className, // inherit all the classes from the link
+      "id" : link.id, // also inherit, giving more style control to the user
+      "style" : { 
+        "border" : '1px solid #aaa'
+      }
+    });
+    ///var url = link.href.replace(/edit/, 'embed');
+    var url = options.url || link.href,
+        size = options.size || getQuery(link.search),
+        holdingUrl = options.holdingUrl;
+
+    styler.css(iframe,"width", size.width || '100%');
+    styler.css(iframe,"minHeight", size.height || '300px');
+    if (size.height) {
+      styler.css(iframe,"maxHeight", size.height);
+    }
+
+    // track when it comes into view and reload
+    if (geom.inview(link, 100)) {
+      // the iframe is full view, let's render it
+      ///iframe.src = url.split('&')[0];
+      ///iframe._src = url.split('&')[0]; // support for google slide embed
+      ///hookMessaging(iframe);
+      loadReal(iframe,{url})
+    } else {
+      ///iframe.setAttribute('data-url', url);
+      ///iframe.src = 'https://jsbin.com/embed-holding';
+      ///pending.push(iframe);
+      lazyLoad(iframe,{
+        url,
+        holdingUrl
+      });
+
+    }
+
+    noder.replace(iframe, link);
+  }
+
+  return iframes.replace = replace;
+});
+define('skylark-domx-iframes/main',[
+	"./iframes",
+	"./create",
+	"./lazy-load",
+	"./load-real",
+	"./replace"
+],function(){
+	
+});
+define('skylark-domx-iframes', ['skylark-domx-iframes/main'], function (main) { return main; });
+
+define('skylark-domx/iframes',[
+    "skylark-domx-iframes"
+], function( iframes) {
+    return iframes;
+});
+define('skylark-domx-lists/lists',[
+	"skylark-langx-ns",
+	"skylark-domx-query",
+	"skylark-domx-data",
+	"skylark-domx-geom",
+	"skylark-domx-finder",
+	"skylark-domx-noder",
+	"skylark-domx-styler"
+],function(skylark){
+	return skylark.attach("domx.lists");
+});
+define('skylark-langx/main',[
+    "./langx"
+], function(langx) {
+    return langx;
+});
+
+define('skylark-langx', ['skylark-langx/main'], function (main) { return main; });
+
+define('skylark-domx-lists/multitier',[
+	"skylark-langx",
+	"skylark-domx-query",
+	"./lists"
+],function(langx,$,lists){
+  'use strict'
+
+	function multitier(elm,options) {
+		options = langx.mixin({
+
+			classes : {
+				active : "active",
+				collapse : "collapse",
+				in : "in",
+			},
+
+			selectors : {
+				item : "li",                   // ".list-group-item"
+				sublist : "ul",  // "> .list-group"
+				hasSublist : ":has(ul)",
+				handler : " > a"
+			},
+
+
+			mode   : "",  // "tree" or "accordion" or "popover"
+
+			levels : 2,
+
+			togglable : false,
+			multiExpand : false,
+
+			/*
+			show : function($el) {
+				$el.show();
+			},
+
+			hide : function($el) {
+				//$el.hide();
+				$el.add
+			},
+
+			toggle : function($el) {
+				$el.toggle();
+			}
+			*/
+		},options,true);
+
+    var itemSelector = options.selectors.item,
+        $items = $(itemSelector,elm),
+
+        activeClass = options.classes.active,
+        activeSelector = "." + activeClass,
+
+		multitierMode = options.mode,
+
+        sublistSelector = options.selectors.sublist,  
+        togglable = options.togglable,   
+        multiExpand = options.multiExpand,
+        handlerSelector = options.selectors.handler,
+
+        collapseClass = options.classes.collapse,
+        inClass = options.classes.in,
+        inSelector = "." + inClass,
+
+        show = options.show || function($el) {
+        	$el.addClass(inClass);
+        },
+        hide = options.hide || function($el) {
+        	$el.addClass(collapseClass).removeClass(inClass);
+
+        },
+        toggle = options.toggle || function($el) {
+			if ($el.hasClass(inClass)) {
+				hide($el);
+			} else {
+				show($el);
+			}
+        };
+
+     $items.find(handlerSelector).on("click.multitier", function(e) {
+          e.preventDefault();
+
+          let $children,
+          	  $clickedItem =  $(this).closest(itemSelector);
+
+          if (!multiExpand) {
+              ///langx.scall($(this).closest(itemSelector).siblings().removeClass("active").children(sublistSelector+".in").plugin("domx.toggles.collapse"),"hide");
+              //$clildren = $(this).closest(itemSelector).siblings().removeClass(activeClass).children(sublistSelector+"."+options.classes.in);
+              $children = $clickedItem.siblings().removeClass(activeClass).children(sublistSelector);
+              if ($children) {
+	              hide($children);
+              }
+          }
+          //$(this).closest(itemSelector).toggleClass(activeClass).children(sublistSelector).plugin("domx.toggles.collapse").toggle();
+          let isActiveItem = $clickedItem.hasClass(activeClass);
+          if (!isActiveItem || togglable) {
+	          $children = $clickedItem.children(options.selectors.sublist);
+	          if (isActiveItem) {
+				$clickedItem.removeClass(activeClass);
+				hide($children)  	
+	          } else {
+				$clickedItem.addClass(activeClass);
+				show($children)  	
+	          }
+
+          }
+      });
+
+      hide($items.has(sublistSelector).children(sublistSelector));
+
+      show($items.filter(activeSelector).has(sublistSelector).children(sublistSelector))
+
+
+	}
+
+	return lists.multitier = multitier
+});
+define('skylark-domx-lists/main',[
+	"./lists",
+	"./multitier"
+],function(lists){
+	return lists;
+});
+define('skylark-domx-lists', ['skylark-domx-lists/main'], function (main) { return main; });
+
+define('skylark-domx/lists',[
+    "skylark-domx-lists"
+], function( lists) {
+
+    return lists;
+});
+define('skylark-domx/noder',[
+    "skylark-domx-noder"
+], function( noder) {
+
+    return noder;
+});
+define('skylark-domx/styler',[
+    "skylark-domx-styler"
+], function( styler) {
+
+    return styler;
+});
+define('skylark-domx/query',[
+    "skylark-domx-query",
+    "./data",
+    "./eventer",
+    "./fx",
+    "./geom",
+    "./styler"
+], function( query) {
+
+    return query;
+
+});
+define('skylark-domx-transforms/transforms',[
+    "skylark-langx/skylark",
+    "skylark-langx/langx",
+    "skylark-domx-browser",
+    "skylark-domx-data",
+    "skylark-domx-styler"
+], function(skylark,langx,browser,datax,styler) {
+  var css3Transform = browser.normalizeCssProperty("transform");
+
+  function getMatrix(radian, x, y) {
+    var Cos = Math.cos(radian), Sin = Math.sin(radian);
+    return {
+      M11: Cos * x, 
+      M12: -Sin * y,
+      M21: Sin * x, 
+      M22: Cos * y
+    };
+  }
+
+  function getZoom(scale, zoom) {
+      return scale > 0 && scale > -zoom ? zoom :
+        scale < 0 && scale < zoom ? -zoom : 0;
+  }
+
+  function change(el,d) {
+      var matrix = getMatrix(d.radian, d.y, d.x);
+      styler.css(el,css3Transform, "matrix("
+        + matrix.M11.toFixed(16) + "," + matrix.M21.toFixed(16) + ","
+        + matrix.M12.toFixed(16) + "," + matrix.M22.toFixed(16) + ", 0, 0)"
+      );      
+  }
+
+  function transformData(el,d) {
+    if (d) {
+      datax.data(el,"transform",d);
+    } else {
+      d = datax.data(el,"transform") || {};
+      d.radian = d.radian || 0;
+      d.x = d.x || 1;
+      d.y = d.y || 1;
+      d.zoom = d.zoom || 1;
+      return d;     
+    }
+  }
+
+  var calcs = {
+    //Vertical flip
+    vertical : function (d) {
+        d.radian = Math.PI - d.radian; 
+        d.y *= -1;
+    },
+
+   //Horizontal flip
+    horizontal : function (d) {
+        d.radian = Math.PI - d.radian; 
+        d.x *= -1;
+    },
+
+    //Rotate according to angle
+    rotate : function (d,degress) {
+        d.radian = degress * Math.PI / 180;; 
+    },
+
+    //Turn left 90 degrees
+    left : function (d) {
+        d.radian -= Math.PI / 2; 
+    },
+
+    //Turn right 90 degrees
+    right : function (d) {
+        d.radian += Math.PI / 2; 
+    },
+ 
+    //zoom
+    scale: function (d,zoom) {
+        var hZoom = getZoom(d.y, zoom), vZoom = getZoom(d.x, zoom);
+        if (hZoom && vZoom) {
+          d.y += hZoom; 
+          d.x += vZoom;
+        }
+    }, 
+
+    //zoom in
+    zoomin: function (d) { 
+      calcs.scale(d,0.1); 
+    },
+    
+    //zoom out
+    zoomout: function (d) { 
+      calcs.scale(d,-0.1); 
+    }
+
+  };
+  
+  
+  function _createApiMethod(calcFunc) {
+    return function() {
+      var args = langx.makeArray(arguments),
+        el = args.shift(),
+          d = transformData(el);
+        args.unshift(d);
+        calcFunc.apply(this,args)
+        change(el,d);
+        transformData(el,d);
+    }
+  }
+  
+
+  function matrix(el) {
+    var appliedTransforms = '';
+    do {
+      var transform = styler.css(el, 'transform');
+
+      if (transform && transform !== 'none') {
+        appliedTransforms = transform + ' ' + appliedTransforms;
+      }
+      /* jshint boss:true */
+    } while (el = el.parentElement);
+
+    if (window.DOMMatrix) {
+      return new DOMMatrix(appliedTransforms);
+    } else if (window.WebKitCSSMatrix) {
+      return new WebKitCSSMatrix(appliedTransforms);
+    } else if (window.CSSMatrix) {
+      return new CSSMatrix(appliedTransforms);
+    }
+  }
+   
+  function transforms() {
+    return transforms;
+  }
+
+  ["vertical","horizontal","rotate","left","right","scale","zoom","zoomin","zoomout"].forEach(function(name){
+    transforms[name] = _createApiMethod(calcs[name]);
+  });
+
+  langx.mixin(transforms, {
+    reset : function(el) {
+      var d = {
+        x : 1,
+        y : 1,
+        radian : 0,
+      }
+      change(el,d);
+      transformData(el,d);
+    },
+    matrix
+  });
+
+
+  return skylark.attach("domx.transforms", transforms);
+});
+
+define('skylark-domx-transforms/main',[
+	"./transforms"
+],function(transforms){
+	return transforms;
+});
+define('skylark-domx-transforms', ['skylark-domx-transforms/main'], function (main) { return main; });
+
+define('skylark-domx/transforms',[
+    "skylark-domx-transforms"
+], function(transforms) {
+  return transforms;
+});
+
+define('skylark-domx/transits',[
+    "skylark-domx-transits"
+], function( transits) {
+    return transits;
+});
+define('skylark-domx/velm',[
+    "skylark-domx-velm",
+    "./data",
+    "./eventer",
+    "./fx",
+    "./geom",
+    "./styler"
+], function( velm) {
+     return velm;
+});
+define('skylark-domx/main',[
+    "./animates",
+    "./browser",
+    "./css",
+    "./data",
+    "./eventer",
+    "./finder",
+    "./fx",
+    "./geom",
+    "./iframes",
+    "./lists",
+    "./noder",
+    "./query",
+    "./styler",
+    "./transforms",
+    "./transits",
+    "./velm"
+], function(animates,browser,css,data,eventer,finder,fx,geom,iframes,lists,noder,query,styler,transforms,transits,velm) {
+    return {
+        animates,
+        browser,
+        css,
+        data,
+        eventer,
+        finder,
+        geom,
+        lists,
+        noder,
+        iframes,
+        query,
+        styler,
+        transforms,
+        transits,
+        velm
+    };
+})
+;
+define('skylark-domx', ['skylark-domx/main'], function (main) { return main; });
+
 define('skylark-domx-plugins-base/plugin',[
     "skylark-langx-ns",
     "skylark-langx-types",
@@ -19197,6 +20778,7 @@ define('skylark-domx-plugins-base/plugin',[
     "skylark-domx-fx",
     "skylark-domx-query",
     "skylark-domx-velm",
+    "skylark-domx",
     "./plugins"
 ], function(
     skylark,
@@ -19213,6 +20795,7 @@ define('skylark-domx-plugins-base/plugin',[
     fx, 
     $, 
     elmx,
+    domx,
     plugins
 ) {
     "use strict";
@@ -19231,6 +20814,8 @@ define('skylark-domx-plugins-base/plugin',[
  
     var Plugin =   Emitter.inherit({
         klassName: "Plugin",
+
+        _domx : domx,
 
         _construct : function(elm,options) {
            this._elm = elm;
@@ -19304,7 +20889,7 @@ define('skylark-domx-plugins-base/plugin',[
 
         $ : function(elm) {
             if (elm) {
-                return $(elm);
+                return $(elm,this._elm);
             }
             if (!this._$elm) {
                 this._$elm = $(this._elm);
@@ -19380,7 +20965,30 @@ define('skylark-domx-plugins-base/plugin',[
 
         elm : function() {
             return this._elm;
-        }
+        },
+
+        ensureListenedEmitter : $,
+
+        listenTo : function(obj, event, selector,callback, /*used internally*/ one) {
+            if (types.isString(obj) || types.isArray(obj) || types.isPlainObject(obj)) {
+                one = callback;
+                callback = selector;
+                selector = event;
+                event = obj;
+                obj = this._elm;
+            }
+            return Emitter.prototype.listenTo.call(this,obj, event, selector,callback, /*used internally*/ one)
+        },
+
+        unlistenTo : function(obj, event, callback) {
+            if (types.isString(obj) || types.isArray(obj) || types.isPlainObject(obj)) {
+                callback = event;
+                event = obj;
+                obj = this._elm;
+            }
+            return Emitter.prototype.unlistenTo.call(this,obj, event, callback)
+        },
+
 
     });
 
@@ -19617,6 +21225,185 @@ define('skylark-domx-plugins-base/main',[
 });
 define('skylark-domx-plugins-base', ['skylark-domx-plugins-base/main'], function (main) { return main; });
 
+define( 'skylark-domx-plugins-interact/mouser',[
+	"skylark-domx-data",
+	"skylark-domx-plugins-base",
+    "./interact"
+],function(datax,plugins, interact) {
+
+	var Mouser = plugins.Plugin.inherit({
+		klassName : "Mouser",
+
+		pluginName : "lark.interact.mouser",
+
+		options: {
+			cancel: "input, textarea, button, select, option",
+			distance: 1,
+			delay: 0,
+
+			// These are placeholder methods, to be overriden by caller
+			started: function( /* event */ ) {},
+			moving: function( /* event */ ) {},
+			stopped: function( /* event */ ) {},
+			capture: function( /* event */ ) { return true; }
+		},
+
+        _construct : function (elm, options) {
+            this.overrided(elm,options);
+
+            options = this.options;
+
+            this._startedCallback = options.started; 
+            this._movingCallback = options.moving;
+            this._stoppedCallback = options.stopped;
+            this._captureCallback = options.capture;
+
+			this.listenTo({
+				"mousedown" : this._mouseDown,
+				"click" : this._click
+			});
+
+			this.started = false;
+
+        },
+
+		_click : function(event) {
+			if ( true === datax.data( event.target, this.pluginName + ".preventClickEvent" ) ) {
+				datax.removeData( event.target, this.pluginName + ".preventClickEvent" );
+				event.stopImmediatePropagation();
+				return false;
+			}
+		},
+
+		_mouseDown: function( event ) {
+    		this._mouseMoved = false;
+
+			// We may have missed mouseup (out of window)
+			if (this._mouseStarted) {
+				this._mouseUp(event);	
+			} 
+
+			this._mouseDownEvent = event;
+
+			var that = this,
+				btnIsLeft = ( event.which === 1 ),
+
+				// event.target.nodeName works around a bug in IE 8 with
+				// disabled inputs (#7620)
+				elIsCancel = ( typeof this.options.cancel === "string" && event.target.nodeName ?
+					$( event.target).closest( this.options.cancel ).length : false );
+			if ( !btnIsLeft || elIsCancel || !this._captureCallback( event )) {
+				return true;
+			}
+
+			this.mouseDelayMet = !this.options.delay;
+			if ( !this.mouseDelayMet ) {
+				this._mouseDelayTimer = setTimeout( function() {
+					that.mouseDelayMet = true;
+				}, this.options.delay );
+			}
+
+			if ( this._mouseDistanceMet( event ) && this._mouseDelayMet( event ) ) {
+				this._mouseStarted = ( this._startedCallback( event ) !== false );
+				if ( !this._mouseStarted ) {
+					event.preventDefault();
+					return true;
+				}
+			}
+
+			// Click event may never have fired (Gecko & Opera)
+			if ( true === datax.data( event.target, this.pluginName + ".preventClickEvent" ) ) {
+				datax.removeData( event.target, this.pluginName + ".preventClickEvent" );
+			}
+
+			// These delegates are required to keep context
+			/*
+			this._mouseMoveDelegate = function( event ) {
+				return that._mouseMove( event );
+			};
+			this._mouseUpDelegate = function( event ) {
+				return that._mouseUp( event );
+			};
+
+			$doc
+				.on( "mousemove." + this.pluginName, this._mouseMoveDelegate )
+				.on( "mouseup." + this.pluginName, this._mouseUpDelegate );
+			*/
+
+			this.listenTo(document,{
+				mousemove : this._mouseMove,
+				mouseup : this._mouseUp
+			})
+
+			this._domx.eventer.stop(event);
+
+			return true;
+		},
+
+		_mouseMove: function( event ) {
+			if ( event.which || event.button ) {
+				this._mouseMoved = true;
+			}
+
+			if ( this._mouseStarted ) {
+				this._movingCallback( event );
+				return event.preventDefault();
+			}
+
+			if ( this._mouseDistanceMet( event ) && this._mouseDelayMet( event ) ) {
+				this._mouseStarted =
+					( this._startedCallback( this._mouseDownEvent, event ) !== false );
+				if(this._mouseStarted) {
+					this._movingCallback( event );	
+				}  else {
+					this._mouseUp( event )
+				};
+			}
+
+			return !this._mouseStarted;
+		},
+
+		_mouseUp: function( event ) {
+			this.unlistenTo(document);
+
+			if ( this._mouseStarted ) {
+				this._mouseStarted = false;
+
+				if ( event.target === this._mouseDownEvent.target ) {
+					datax.data( event.target, this.pluginName + ".preventClickEvent", true );
+				}
+
+				this._stoppedCallback( event );
+			}
+
+			if ( this._mouseDelayTimer ) {
+				clearTimeout( this._mouseDelayTimer );
+				delete this._mouseDelayTimer;
+			}
+
+			mouseHandled = false;
+			event.preventDefault();
+		},
+
+		_mouseDistanceMet: function( event ) {
+			return ( Math.max(
+					Math.abs( this._mouseDownEvent.pageX - event.pageX ),
+					Math.abs( this._mouseDownEvent.pageY - event.pageY )
+				) >= this.options.distance
+			);
+		},
+
+		_mouseDelayMet: function( /* event */ ) {
+			return this.mouseDelayMet;
+		}
+	});
+
+
+	plugins.register(Mouser);
+
+	return interact.Mouser = Mouser;
+});
+
 define('skylark-domx-plugins-interact/movable',[
     "skylark-langx/langx",
     "skylark-domx-noder",
@@ -19625,8 +21412,9 @@ define('skylark-domx-plugins-interact/movable',[
     "skylark-domx-eventer",
     "skylark-domx-styler",
     "skylark-domx-plugins-base",
-    "./interact"
-],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
+    "./interact",
+    "./mouser"
+],function(langx,noder,datax,geom,eventer,styler,plugins,interact,Mouser){
     var on = eventer.on,
         off = eventer.off,
         attr = datax.attr,
@@ -19646,8 +21434,7 @@ define('skylark-domx-plugins-interact/movable',[
         _construct : function (elm, options) {
             this.overrided(elm,options);
 
-
-
+            /*
             function updateWithTouchData(e) {
                 var keys, i;
 
@@ -19658,6 +21445,7 @@ define('skylark-domx-plugins-interact/movable',[
                     }
                 }
             }
+            */
 
             function updateWithMoveData(e) {
                 e.movable = self;
@@ -19675,8 +21463,6 @@ define('skylark-domx-plugins-interact/movable',[
                 downButton,
                 start,
                 stop,
-                startX,
-                startY,
                 originalPos,
                 drag,
                 size,
@@ -19689,7 +21475,7 @@ define('skylark-domx-plugins-interact/movable',[
                     var docSize = geom.getDocumentSize(doc),
                         cursor;
 
-                    updateWithTouchData(e);
+                    ///updateWithTouchData(e);
                     updateWithMoveData(e);
 
                     if (startingCallback) {
@@ -19715,9 +21501,7 @@ define('skylark-domx-plugins-interact/movable',[
                     e.preventDefault();
 
                     downButton = e.button;
-                    //handleEl = getHandleEl();
-                    startX = e.screenX;
-                    startY = e.screenY;
+ 
 
                     originalPos = geom.relativePosition(elm);
                     size = geom.size(elm);
@@ -19738,7 +21522,7 @@ define('skylark-domx-plugins-interact/movable',[
                     });
                     noder.append(doc.body, overlayDiv);
 
-                    eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
+                    ////eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
 
                     if (startedCallback) {
                         startedCallback(e);
@@ -19746,17 +21530,14 @@ define('skylark-domx-plugins-interact/movable',[
                 },
 
                 move = function(e) {
-                    updateWithTouchData(e);
+                    ///updateWithTouchData(e);
                     updateWithMoveData(e);
 
                     if (e.button !== 0) {
                         return stop(e);
                     }
 
-                    e.deltaX = e.screenX - startX;
-                    e.deltaY = e.screenY - startY;
-
-                    if (auto) {
+                   if (auto) {
                         var l = originalPos.left + e.deltaX,
                             t = originalPos.top + e.deltaY;
                         if (constraints) {
@@ -19791,9 +21572,9 @@ define('skylark-domx-plugins-interact/movable',[
                 },
 
                 stop = function(e) {
-                    updateWithTouchData(e);
+                    ///updateWithTouchData(e);
 
-                    eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
+                    ///eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
 
                     noder.remove(overlayDiv);
 
@@ -19802,14 +21583,21 @@ define('skylark-domx-plugins-interact/movable',[
                     }
                 };
 
-            eventer.on(handleEl, "mousedown touchstart", start);
+            ///eventer.on(handleEl, "mousedown touchstart", start);
 
             this._handleEl = handleEl;
+            this._mouser = new Mouser(this._handleEl,{
+                started : start,
+                moving : move,
+                stopped : stop
+            })
 
         },
 
         remove : function() {
-            eventer.off(this._handleEl);
+            this._mouser.destroy();
+            this._mouser = null;
+            ///eventer.off(this._handleEl);
         }
     });
 
@@ -20201,6 +21989,433 @@ define('skylark-domx-plugins-interact/rotatable',[
     return interact.Rotatable = Rotatable;
 });
 
+define('skylark-domx-plugins-interact/Movable',[
+    "skylark-langx/langx",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-plugins-base",
+    "./interact",
+    "./mouser"
+],function(langx,noder,datax,geom,eventer,styler,plugins,interact,Mouser){
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height,
+        some = Array.prototype.some,
+        map = Array.prototype.map;
+
+    var Movable = plugins.Plugin.inherit({
+        klassName: "Movable",
+
+        pluginName : "lark.interact.movable",
+
+
+        _construct : function (elm, options) {
+            this.overrided(elm,options);
+
+            /*
+            function updateWithTouchData(e) {
+                var keys, i;
+
+                if (e.changedTouches) {
+                    keys = "screenX screenY pageX pageY clientX clientY".split(' ');
+                    for (i = 0; i < keys.length; i++) {
+                        e[keys[i]] = e.changedTouches[0][keys[i]];
+                    }
+                }
+            }
+            */
+
+            function updateWithMoveData(e) {
+                e.movable = self;
+                e.moveEl = elm;
+                e.handleEl = handleEl;
+            }
+
+            options = this.options;
+            var self = this,
+                handleEl = options.handle || elm,
+                auto = options.auto === false ? false : true,
+                constraints = options.constraints,
+                overlayDiv,
+                doc = options.document || document,
+                downButton,
+                start,
+                stop,
+                originalPos,
+                drag,
+                size,
+                startingCallback = options.starting,
+                startedCallback = options.started,
+                movingCallback = options.moving,
+                stoppedCallback = options.stopped,
+
+                start = function(e) {
+                    var docSize = geom.getDocumentSize(doc),
+                        cursor;
+
+                    ///updateWithTouchData(e);
+                    updateWithMoveData(e);
+
+                    if (startingCallback) {
+                        var ret = startingCallback(e)
+                        if ( ret === false) {
+                            return;
+                        } else if (langx.isPlainObject(ret)) {
+                            if (ret.constraints) {
+                                constraints = ret.constraints;
+                            }
+                            if (ret.started) {
+                                startedCallback = ret.started;
+                            }
+                            if (ret.moving) {
+                                movingCallback = ret.moving;
+                            }                            
+                            if (ret.stopped) {
+                                stoppedCallback = ret.stopped;
+                            }     
+                        }
+                    }
+
+                    e.preventDefault();
+
+                    downButton = e.button;
+ 
+
+                    originalPos = geom.relativePosition(elm);
+                    size = geom.size(elm);
+
+                    // Grab cursor from handle so we can place it on overlay
+                    cursor = styler.css(handleEl, "cursor");
+
+                    overlayDiv = noder.createElement("div");
+                    styler.css(overlayDiv, {
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: docSize.width,
+                        height: docSize.height,
+                        zIndex: 0x7FFFFFFF,
+                        opacity: 0.0001,
+                        cursor: cursor
+                    });
+                    noder.append(doc.body, overlayDiv);
+
+                    ////eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
+
+                    if (startedCallback) {
+                        startedCallback(e);
+                    }
+                },
+
+                move = function(e) {
+                    ///updateWithTouchData(e);
+                    updateWithMoveData(e);
+
+                    if (e.button !== 0) {
+                        return stop(e);
+                    }
+
+                   if (auto) {
+                        var l = originalPos.left + e.deltaX,
+                            t = originalPos.top + e.deltaY;
+                        if (constraints) {
+
+                            if (l < constraints.minX) {
+                                l = constraints.minX;
+                            }
+
+                            if (l > constraints.maxX) {
+                                l = constraints.maxX;
+                            }
+
+                            if (t < constraints.minY) {
+                                t = constraints.minY;
+                            }
+
+                            if (t > constraints.maxY) {
+                                t = constraints.maxY;
+                            }
+                        }
+                    }
+
+                    geom.relativePosition(elm, {
+                        left: l,
+                        top: t
+                    })
+
+                    e.preventDefault();
+                    if (movingCallback) {
+                        movingCallback(e);
+                    }
+                },
+
+                stop = function(e) {
+                    ///updateWithTouchData(e);
+
+                    ///eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
+
+                    noder.remove(overlayDiv);
+
+                    if (stoppedCallback) {
+                        stoppedCallback(e);
+                    }
+                };
+
+            ///eventer.on(handleEl, "mousedown touchstart", start);
+
+            this._handleEl = handleEl;
+            this._mouser = new Mouser(this._handleEl,{
+                started : start,
+                moving : move,
+                stopped : stop
+            })
+
+        },
+
+        remove : function() {
+            this._mouser.destroy();
+            this._mouser = null;
+            ///eventer.off(this._handleEl);
+        }
+    });
+
+    plugins.register(Movable,"movable");
+
+    return interact.Movable = Movable;
+});
+
+define('skylark-domx-plugins-interact/selectable',[
+    "skylark-langx/langx",
+    "skylark-domx-noder",
+    "skylark-domx-data",
+    "skylark-domx-geom",
+    "skylark-domx-eventer",
+    "skylark-domx-styler",
+    "skylark-domx-query",
+    "./interact",
+    "./Movable"
+],function(langx,noder,datax,geom,eventer,styler,$,interact,Movable){
+    var on = eventer.on,
+        off = eventer.off,
+        attr = datax.attr,
+        removeAttr = datax.removeAttr,
+        offset = geom.pagePosition,
+        addClass = styler.addClass,
+        height = geom.height,
+        some = Array.prototype.some,
+        map = Array.prototype.map;
+
+
+
+    var options = {
+        // Function which returns custom X and Y coordinates of the mouse
+            mousePosFetcher: null,
+            // Indicates custom target updating strategy
+            updateTarget: null,
+            // Function which gets HTMLElement as an arg and returns it relative position
+            ratioDefault: 0,
+            posFetcher: null,
+
+            started: null,
+            moving: null,
+            ended: null,
+
+            // Resize unit step
+            step: 1,
+
+            // Minimum dimension
+            minDim: 32,
+
+            // Maximum dimension
+            maxDim: '',
+
+            // Unit used for height resizing
+            unitHeight: 'px',
+
+            // Unit used for width resizing
+            unitWidth: 'px',
+
+            // The key used for height resizing
+            keyHeight: 'height',
+
+            // The key used for width resizing
+            keyWidth: 'width',
+
+            // If true, will override unitHeight and unitWidth, on start, with units
+            // from the current focused element (currently used only in SelectComponent)
+            currentUnit: 1,
+
+            // Handlers
+            direction : {
+                tl: 1, // Top left
+                tc: 1, // Top center
+                tr: 1, // Top right
+                cl: 1, // Center left
+                cr: 1, // Center right
+                bl: 1, // Bottom left
+                bc: 1, // Bottom center
+                br: 1 // Bottom right,
+            },
+            handler : {
+                border : true,
+                grabber: "",
+                selector: true
+            }
+        } ,
+
+
+        currentPos,
+        startRect,
+        currentRect,
+        delta;
+
+    var classPrefix = "",
+        container,
+        handlers,
+        target,
+        direction ={
+            left : true,
+            right : true,
+            top : true,
+            bottom : true
+        },
+        startSize,
+        currentSize,
+
+        startedCallback,
+        resizingCallback,
+        stoppedCallback;
+
+    function init (options) {
+        options = options || {};
+        classPrefix = options.classPrefix || "";
+
+        var appendTo = options.appendTo || document.body;
+        container = noder.createElement('div',{},{
+            "class" : classPrefix + 'resizer-c'
+        });
+        noder.append(appendTo,container);
+
+
+        // Create handlers
+        handlers = {};
+        ['tl', 'tc', 'tr', 'cl', 'cr', 'bl', 'bc', 'br'].forEach(function(n) {
+            return handlers[n] = noder.createElement("i",{},{
+                    "class" : classPrefix + 'resizer-h ' + classPrefix + 'resizer-h-' + n,
+                    "data-resize-handler" : n
+                });
+        });
+
+        for (var n in handlers) {
+            var handler = handlers[n];
+            noder.append(container,handler);
+            Movable(handler,{
+                auto : false,
+                started : started,
+                moving : resizing,
+                stopped : stopped
+            })
+        }
+    }
+
+    function started(e) {
+        var handler = e.target;
+        startSize = geom.size(target);
+        if (startedCallback) {
+            startedCallback(e);
+        }
+    }
+
+    function resizing(e) {
+        currentSize = {};
+
+        if (direction.left || direction.right) {
+            currentSize.width = startSize.width + e.deltaX;
+        } else {
+            currentSize.width = startSize.width;
+        }
+
+        if (direction.top || direction.bottom) {
+            currentSize.height = startSize.height + e.deltaY;
+        } else {
+            currentSize.height = startSize.height;
+        }
+
+        geom.size(target,currentSize);
+        geom.pageRect(container,geom.pageRect(target));
+
+        if (resizingCallback) {
+            resizingCallback(e);
+        }
+
+    }
+
+    function stopped(e) {
+        if (stoppedCallback) {
+            stoppedCallback(e);
+        }
+
+    }
+
+    function select(el,options) {
+        // Avoid focusing on already focused element
+        if (el && el === target) {
+          return;
+        } 
+
+        target = el; 
+        startDim = rectDim = startPos = null;
+
+        geom.pageRect(container,geom.pageRect(target));
+        styler.show(container);
+
+    }
+
+
+    function unselect(e) {
+        if (container) {
+            styler.hide(container);
+        }
+        target = null;
+    }
+
+    function isHandler(el) {
+        if (handlers) {
+            for (var n in handlers) {
+              if (handlers[n] === el) return true;
+            }                
+        }
+        return false;
+    }
+
+
+    function docs(el) {
+        return [noder.ownerDoc(el), noder.doc()];
+    }
+
+    function selector(){
+      return selector;
+    }
+
+    langx.mixin(selector, {
+        init : init,
+
+        select : select,
+
+        unselect : unselect
+
+    });
+
+    return interact.Selectable = selector;
+});
+
 define('skylark-domx-plugins-interact/scalable',[
     "skylark-langx/langx",
     "skylark-domx-noder",
@@ -20267,10 +22482,12 @@ define('skylark-domx-plugins-interact/scalable',[
 
 define('skylark-domx-plugins-interact/main',[
     "./interact",
+    "./mouser",
     "./movable",
     "./resizable",
     "./rotatable",
     "./rotatable",
+    "./selectable",
     "./scalable"
 ], function(interact) {
     return interact;

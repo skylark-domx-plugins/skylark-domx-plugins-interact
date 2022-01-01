@@ -6,8 +6,9 @@ define([
     "skylark-domx-eventer",
     "skylark-domx-styler",
     "skylark-domx-plugins-base",
-    "./interact"
-],function(langx,noder,datax,geom,eventer,styler,plugins,interact){
+    "./interact",
+    "./mouser"
+],function(langx,noder,datax,geom,eventer,styler,plugins,interact,Mouser){
     var on = eventer.on,
         off = eventer.off,
         attr = datax.attr,
@@ -27,8 +28,7 @@ define([
         _construct : function (elm, options) {
             this.overrided(elm,options);
 
-
-
+            /*
             function updateWithTouchData(e) {
                 var keys, i;
 
@@ -39,6 +39,7 @@ define([
                     }
                 }
             }
+            */
 
             function updateWithMoveData(e) {
                 e.movable = self;
@@ -56,8 +57,6 @@ define([
                 downButton,
                 start,
                 stop,
-                startX,
-                startY,
                 originalPos,
                 drag,
                 size,
@@ -70,7 +69,7 @@ define([
                     var docSize = geom.getDocumentSize(doc),
                         cursor;
 
-                    updateWithTouchData(e);
+                    ///updateWithTouchData(e);
                     updateWithMoveData(e);
 
                     if (startingCallback) {
@@ -96,9 +95,7 @@ define([
                     e.preventDefault();
 
                     downButton = e.button;
-                    //handleEl = getHandleEl();
-                    startX = e.screenX;
-                    startY = e.screenY;
+ 
 
                     originalPos = geom.relativePosition(elm);
                     size = geom.size(elm);
@@ -119,7 +116,7 @@ define([
                     });
                     noder.append(doc.body, overlayDiv);
 
-                    eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
+                    ////eventer.on(doc, "mousemove touchmove", move).on(doc, "mouseup touchend", stop);
 
                     if (startedCallback) {
                         startedCallback(e);
@@ -127,17 +124,14 @@ define([
                 },
 
                 move = function(e) {
-                    updateWithTouchData(e);
+                    ///updateWithTouchData(e);
                     updateWithMoveData(e);
 
                     if (e.button !== 0) {
                         return stop(e);
                     }
 
-                    e.deltaX = e.screenX - startX;
-                    e.deltaY = e.screenY - startY;
-
-                    if (auto) {
+                   if (auto) {
                         var l = originalPos.left + e.deltaX,
                             t = originalPos.top + e.deltaY;
                         if (constraints) {
@@ -172,9 +166,9 @@ define([
                 },
 
                 stop = function(e) {
-                    updateWithTouchData(e);
+                    ///updateWithTouchData(e);
 
-                    eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
+                    ///eventer.off(doc, "mousemove touchmove", move).off(doc, "mouseup touchend", stop);
 
                     noder.remove(overlayDiv);
 
@@ -183,14 +177,21 @@ define([
                     }
                 };
 
-            eventer.on(handleEl, "mousedown touchstart", start);
+            ///eventer.on(handleEl, "mousedown touchstart", start);
 
             this._handleEl = handleEl;
+            this._mouser = new Mouser(this._handleEl,{
+                started : start,
+                moving : move,
+                stopped : stop
+            })
 
         },
 
         remove : function() {
-            eventer.off(this._handleEl);
+            this._mouser.destroy();
+            this._mouser = null;
+            ///eventer.off(this._handleEl);
         }
     });
 
