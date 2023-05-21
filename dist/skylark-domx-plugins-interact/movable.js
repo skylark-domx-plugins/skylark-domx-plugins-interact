@@ -1,0 +1,9 @@
+/**
+ * skylark-domx-plugins-interact - The interact features enhancement for dom.
+ * @author Hudaokeji Co.,Ltd
+ * @version v0.9.0
+ * @link www.skylarkjs.org
+ * @license MIT
+ */
+define(["skylark-langx/langx","skylark-domx-noder","skylark-domx-data","skylark-domx-geom","skylark-domx-eventer","skylark-domx-styler","skylark-domx-plugins-base","./interact","./mouser"],function(t,e,o,n,a,i,r,s,l){a.on,a.off,o.attr,o.removeAttr,n.pagePosition,i.addClass,n.height,Array.prototype.some,Array.prototype.map;var m=r.Plugin.inherit({klassName:"Movable",pluginName:"lark.interact.movable",_construct:function(o,a){function s(t){t.movable=u,t.moveEl=o,t.handleEl=p}r.Plugin.prototype._construct.call(this,o,a);var m,d,u=this,p=(a=this.options).handle||o,c=!1!==a.auto,v=a.constraints,h=a.document||document,f=a.starting,g=a.started,k=a.moving,y=a.stopped,x=function(t){e.remove(m),y&&y(t)};this._handleEl=p,this._mouser=new l(this._handleEl,{started:function(a){var r,l=n.getDocumentSize(h);if(s(a),f){var u=f(a);if(!1===u)return;t.isPlainObject(u)&&(u.constraints&&(v=u.constraints),u.started&&(g=u.started),u.moving&&(k=u.moving),u.stopped&&(y=u.stopped))}a.preventDefault(),a.button,d=n.relativePosition(o),n.size(o),r=i.css(p,"cursor"),m=e.createElement("div"),i.css(m,{position:"absolute",top:0,left:0,width:l.width,height:l.height,zIndex:2147483647,opacity:1e-4,cursor:r}),e.append(h.body,m),g&&g(a)},moving:function(t){if(s(t),0!==t.button)return x(t);if(c){var e=d.left+t.deltaX,a=d.top+t.deltaY;v&&(e<v.minX&&(e=v.minX),e>v.maxX&&(e=v.maxX),a<v.minY&&(a=v.minY),a>v.maxY&&(a=v.maxY))}n.relativePosition(o,{left:e,top:a}),t.preventDefault(),k&&k(t)},stopped:x})},remove:function(){this._mouser.destroy(),this._mouser=null}});return r.register(m,"movable"),s.Movable=m});
+//# sourceMappingURL=sourcemaps/movable.js.map

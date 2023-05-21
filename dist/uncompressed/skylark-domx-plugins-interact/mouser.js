@@ -24,7 +24,8 @@ define( [
         _construct : function (elm, options) {
             plugins.Plugin.prototype._construct.call(this,elm,options);
 
-            options = this.options;.prototype._construct.callthis._startedCallback = options.started; 
+            options = this.options;
+            this._startedCallback = options.started; 
             this._movingCallback = options.moving;
             this._stoppedCallback = options.stopped;
             this._captureCallback = options.capture;
