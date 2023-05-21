@@ -42,7 +42,7 @@ define([
 
 
         _construct : function (elm, options) {
-            this.overrided(elm,options);
+            plugins.Plugin.prototype._construct.call(this,elm,options);
 
             let radius = this.options.radius || 0,
                 targets = this.options.targets || elm;

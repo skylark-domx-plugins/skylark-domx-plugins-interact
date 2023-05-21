@@ -22,11 +22,9 @@ define( [
 		},
 
         _construct : function (elm, options) {
-            this.overrided(elm,options);
+            plugins.Plugin.prototype._construct.call(this,elm,options);
 
-            options = this.options;
-
-            this._startedCallback = options.started; 
+            options = this.options;.prototype._construct.callthis._startedCallback = options.started; 
             this._movingCallback = options.moving;
             this._stoppedCallback = options.stopped;
             this._captureCallback = options.capture;
@@ -59,13 +57,14 @@ define( [
 			this._mouseDownEvent = event;
 
 			var that = this,
-				btnIsLeft = ( event.which === 1 ),
+				btnIsLeft = ( event.which === 1 );
 
 				// event.target.nodeName works around a bug in IE 8 with
 				// disabled inputs (#7620)
-				elIsCancel = ( typeof this.options.cancel === "string" && event.target.nodeName ?
-					$( event.target).closest( this.options.cancel ).length : false );
-			if ( !btnIsLeft || elIsCancel || !this._captureCallback( event )) {
+				////elIsCancel = ( typeof this.options.cancel === "string" && event.target.nodeName ?
+				///$( event.target).closest( this.options.cancel ).length : false );
+			///if ( !btnIsLeft || elIsCancel || !this._captureCallback( event )) {
+			if ( !btnIsLeft  || !this._captureCallback( event )) {
 				return true;
 			}
 
@@ -103,6 +102,9 @@ define( [
 				.on( "mouseup." + this.pluginName, this._mouseUpDelegate );
 			*/
 
+			this._startX = event.screenX;
+            this._startY = event.screenY;
+
 			this.listenTo(document,{
 				mousemove : this._mouseMove,
 				mouseup : this._mouseUp
@@ -114,6 +116,9 @@ define( [
 		},
 
 		_mouseMove: function( event ) {
+            event.deltaX = event.screenX - this._startX;
+            event.deltaY = event.screenY - this._startY;
+
 			if ( event.which || event.button ) {
 				this._mouseMoved = true;
 			}
@@ -154,7 +159,7 @@ define( [
 				delete this._mouseDelayTimer;
 			}
 
-			mouseHandled = false;
+			this._mouseHandled = false;
 			event.preventDefault();
 		},
 

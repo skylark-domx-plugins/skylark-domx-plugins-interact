@@ -71,8 +71,7 @@ define([
         },
 
         _construct :function (elm, options) {
-            this.overrided(elm,options);
-
+            plugins.Plugin.prototype._construct.call(this,elm,options);
 
             options = this.options;
             var handle = options.handle || {},
